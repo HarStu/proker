@@ -1,82 +1,53 @@
-import { Text, View, Pressable, Modal, ScrollView } from "react-native";
+import { Text, View } from "react-native";
 import BoardSetup from "@/components/board-setup";
+import HandPicker from "@/components/hand-picker";
+import CashSelector from "@/components/cash-selector";
+import CalcResult from "@/components/calc-result";
 import type { Card, Deck } from "@/libs/poker";
 import { useState } from "react";
 
 export default function Calc() {
-  const [selectedHand, setSelectedHand] = useState<string>("");
-  const [isHandPickerOpen, setIsHandPickerOpen] = useState(false);
+  const [selectedCards, setSelectedCards] = useState<Card[]>([]);
+  const [targetHand, setTargetHand] = useState<string>("");
+  const [potAmount, setPotAmount] = useState<number>(0);
+  const [callAmount, setCallAmount] = useState<number>(0);
+  const [isCashValid, setIsCashValid] = useState<boolean>(true);
 
-  const hands = [
-    "High Card",
-    "Pair",
-    "Two Pair",
-    "Three of a Kind",
-    "Straight",
-    "Flush",
-    "Full House",
-    "Four of a Kind",
-    "Straight Flush",
-    "Royal Flush"
-  ];
-
-  const handleChange = (selected: Card[], remaining: Deck) => {
-    // For now, just log – parent can use as needed
+  const handleBoardChange = (selected: Card[], remaining: Deck) => {
+    setSelectedCards(selected);
     console.log("selected", selected);
     console.log("remaining", remaining.length);
   };
 
+  const handleHandSelected = (hand: string) => {
+    setTargetHand(hand);
+    console.log("selected hand:", hand);
+  };
+
+  const handleCashChange = (pot: number, call: number, isValid: boolean) => {
+    setPotAmount(pot);
+    setCallAmount(call);
+    setIsCashValid(isValid);
+    console.log("pot:", pot, "call:", call, "valid:", isValid);
+  };
+
   return (
-    <ScrollView className="flex-1 bg-green-100">
-      <View className="p-4">
-        <Text className="text-xl font-bold mb-4">Calc</Text>
-        <BoardSetup onChange={handleChange} />
+    <View className="flex-1 bg-green-100">
+      <View className="pt-20 px-4 pb-4">
+        {/* Results at the top */}
+        <CalcResult
+          selectedCards={selectedCards}
+          targetHand={targetHand}
+          potAmount={potAmount}
+          callAmount={callAmount}
+          isCashValid={isCashValid}
+        />
 
-        {/* Hand Selection */}
-        <View className="mt-8 p-4 bg-white rounded-lg">
-          <Text className="text-lg font-bold mb-4">What hand are you drawing to?</Text>
-          <Pressable
-            className="p-4 border-2 border-gray-300 rounded-lg bg-gray-50"
-            onPress={() => setIsHandPickerOpen(true)}
-          >
-            <Text className={selectedHand ? "text-black" : "text-gray-500"}>
-              {selectedHand || "Select a hand..."}
-            </Text>
-          </Pressable>
-        </View>
+        {/* Setup components */}
+        <BoardSetup onChange={handleBoardChange} />
+        <HandPicker onHandSelected={handleHandSelected} />
+        <CashSelector onChange={handleCashChange} />
       </View>
-
-      {/* Hand Picker Modal */}
-      <Modal
-        visible={isHandPickerOpen}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsHandPickerOpen(false)}
-      >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-xl p-4">
-            <Text className="text-lg font-bold mb-4 text-center">Select Hand</Text>
-            {hands.map((hand) => (
-              <Pressable
-                key={hand}
-                className="p-4 border-b border-gray-200"
-                onPress={() => {
-                  setSelectedHand(hand);
-                  setIsHandPickerOpen(false);
-                }}
-              >
-                <Text className="text-lg">{hand}</Text>
-              </Pressable>
-            ))}
-            <Pressable
-              className="p-4 mt-2"
-              onPress={() => setIsHandPickerOpen(false)}
-            >
-              <Text className="text-center text-gray-500">Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-    </ScrollView>
+    </View>
   );
 }

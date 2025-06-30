@@ -1,0 +1,68 @@
+import { Text, View, TextInput } from "react-native";
+import { useState, useEffect } from "react";
+
+interface CashSelectorProps {
+  /**
+   * Callback fired when values change.
+   * pot - chips in pot
+   * call - chips to call
+   * isValid - whether the values make sense (call <= pot)
+   */
+  onChange?: (pot: number, call: number, isValid: boolean) => void;
+}
+
+export default function CashSelector({ onChange }: CashSelectorProps) {
+  const [potAmount, setPotAmount] = useState<string>("");
+  const [callAmount, setCallAmount] = useState<string>("");
+  const [isValid, setIsValid] = useState<boolean>(true);
+
+  useEffect(() => {
+    const pot = parseFloat(potAmount) || 0;
+    const call = parseFloat(callAmount) || 0;
+    const valid = call <= pot;
+    setIsValid(valid);
+    onChange?.(pot, call, valid);
+  }, [potAmount, callAmount, onChange]);
+
+  return (
+    <View className="mt-4 p-4 bg-green-100 rounded-lg">
+      <Text className="text-lg font-bold mb-4">Pot & Call Amounts</Text>
+
+      <View className="flex-row gap-4">
+        {/* Pot Amount */}
+        <View className="flex-1">
+          <Text className="text-sm font-medium mb-2">Chips in Pot</Text>
+          <TextInput
+            className="p-3 border-2 border-gray-300 rounded-lg bg-white"
+            value={potAmount}
+            onChangeText={setPotAmount}
+            placeholder="0"
+            keyboardType="numeric"
+          />
+        </View>
+
+        {/* Call Amount */}
+        <View className="flex-1">
+          <Text className="text-sm font-medium mb-2">Chips to Call</Text>
+          <TextInput
+            className={`p-3 border-2 rounded-lg bg-white ${!isValid && callAmount && potAmount
+              ? 'border-red-500'
+              : 'border-gray-300'
+              }`}
+            value={callAmount}
+            onChangeText={setCallAmount}
+            placeholder="0"
+            keyboardType="numeric"
+          />
+        </View>
+      </View>
+
+      {/* Error Message */}
+      {!isValid && callAmount && potAmount && (
+        <Text className="text-red-600 text-sm mt-2">
+          Call amount cannot be greater than pot amount
+        </Text>
+      )}
+    </View>
+  );
+} 
