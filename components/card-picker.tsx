@@ -77,7 +77,7 @@ export default function CardPicker({ deck, onCardPicked }: { deck: Deck, onCardP
           >
             {!selectedSuit ? (
               <View className="gap-2">
-                <Text className="text-center font-bold mb-2">Select a Suit</Text>
+                <Text className="text-center font-bold mb-2 text-black">Select a Suit</Text>
                 <View className="flex-row flex-wrap justify-center gap-2">
                   {allSuits.map((suit) => (
                     <Pressable
@@ -85,7 +85,7 @@ export default function CardPicker({ deck, onCardPicked }: { deck: Deck, onCardP
                       className={`w-24 h-24 justify-center items-center rounded-lg ${availableCards.suits.has(suit) ? 'bg-gray-100' : 'bg-gray-200'}`}
                       onPress={() => handleSuitSelect(suit)}
                     >
-                      <Text className={`text-4xl ${getSuitColor(suit)} ${!availableCards.suits.has(suit) && 'opacity-30'}`}>
+                      <Text className={`text-2xl ${getSuitColor(suit)} ${!availableCards.suits.has(suit) && 'opacity-30'}`}>
                         {{ h: '♥', d: '♦', c: '♣', s: '♠' }[suit]}
                       </Text>
                     </Pressable>
@@ -94,7 +94,7 @@ export default function CardPicker({ deck, onCardPicked }: { deck: Deck, onCardP
               </View>
             ) : (
               <View className="gap-2">
-                <Text className="text-center font-bold mb-2">Select a Rank</Text>
+                <Text className="text-center font-bold mb-2 text-black">Select a Rank</Text>
                 <View className="flex-row flex-wrap justify-center gap-2">
                   {allRanks.map((rank) => (
                     <Pressable
@@ -102,7 +102,7 @@ export default function CardPicker({ deck, onCardPicked }: { deck: Deck, onCardP
                       className={`w-12 h-12 justify-center items-center rounded-lg ${availableCards.ranksBySuit[selectedSuit].has(rank) ? 'bg-gray-100' : 'bg-gray-200'}`}
                       onPress={() => handleRankSelect(rank)}
                     >
-                      <Text className={`text-lg ${!availableCards.ranksBySuit[selectedSuit].has(rank) && 'opacity-30'}`}>
+                      <Text className={`text-base font-bold ${!availableCards.ranksBySuit[selectedSuit].has(rank) && 'opacity-30'}`}>
                         {({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A' } as Record<number, string>)[rank] || rank}
                       </Text>
                     </Pressable>

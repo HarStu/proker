@@ -102,7 +102,7 @@ export default function BoardSetup({ onChange }: BoardSetupProps) {
       <View className="flex-row justify-center mb-8">
         {/* Flop */}
         <View>
-          <Text className="text-xs mb-1 text-center">the flop</Text>
+          <Text className="text-xs text-center text-black">the flop</Text>
           <View className="flex-row gap-4">
             {boardCards.slice(0, 3).map((card, index) => (
               <View key={index}>
@@ -126,14 +126,21 @@ export default function BoardSetup({ onChange }: BoardSetupProps) {
 
         {/* Turn */}
         <View className="ml-8">
-          <Text className="text-xs mb-1 text-center">the turn</Text>
+          <Text className="text-xs text-center text-black">the turn</Text>
           {boardCards.slice(3, 4).map((card, index) => (
             <View key={index}>
               {card === null ? (
-                <CardPicker
-                  deck={deck}
-                  onCardPicked={handleCardPicked(3, false)}
-                />
+                // Only show CardPicker if all 3 flop cards are selected
+                boardCards.slice(0, 3).every(card => card !== null) ? (
+                  <CardPicker
+                    deck={deck}
+                    onCardPicked={handleCardPicked(3, false)}
+                  />
+                ) : (
+                  <View className="w-20 h-28 bg-gray-200 border-2 border-gray-300 rounded-xl opacity-50 justify-center items-center">
+                    <Text className="text-xs text-black">Locked</Text>
+                  </View>
+                )
               ) : (
                 <Pressable
                   className="w-20 h-28 bg-white border-2 border-gray-300 rounded-xl shadow-md justify-center items-center"
@@ -149,7 +156,7 @@ export default function BoardSetup({ onChange }: BoardSetupProps) {
 
       {/* Hole cards */}
       <View>
-        <Text className="text-xs mb-1 text-center">your cards</Text>
+        <Text className="text-xs text-center text-black">your cards</Text>
         <View className="flex-row justify-center gap-4">
           {holeCards.map((card, index) => (
             <View key={index}>
