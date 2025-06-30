@@ -8,6 +8,7 @@ import { useState } from "react";
 
 export default function Calc() {
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
+  const [remainingDeck, setRemainingDeck] = useState<Deck>([]);
   const [targetHand, setTargetHand] = useState<string>("");
   const [potAmount, setPotAmount] = useState<number>(0);
   const [callAmount, setCallAmount] = useState<number>(0);
@@ -15,6 +16,7 @@ export default function Calc() {
 
   const handleBoardChange = (selected: Card[], remaining: Deck) => {
     setSelectedCards(selected);
+    setRemainingDeck(remaining);
     console.log("selected", selected);
     console.log("remaining", remaining.length);
   };
@@ -33,10 +35,11 @@ export default function Calc() {
 
   return (
     <View className="flex-1 bg-green-100">
-      <View className="pt-20 px-4 pb-4">
+      <View className="pt-16 px-4 pb-4">
         {/* Results at the top */}
         <CalcResult
           selectedCards={selectedCards}
+          remainingDeck={remainingDeck}
           targetHand={targetHand}
           potAmount={potAmount}
           callAmount={callAmount}
