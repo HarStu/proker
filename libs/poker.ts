@@ -291,12 +291,12 @@ export function calculateResult({
     outs = countOuts(holeCards, boardCards, targetHand as HandRanking, remainingDeck);
   }
   if (canShowFullResults) {
+    const cardsToSee = Math.max(0, 5 - boardCards.length);
     equity = calculateEquity(outs, cardsToSee);
     const winAmount = potAmount + callAmount;
     potOdds = callAmount > 0 && potAmount > 0 ? (winAmount / callAmount) : 0;
     const winChance = equity / 100;
     const loseChance = 1 - winChance;
-    const cardsToSee = Math.max(0, 5 - boardCards.length);
     isDrawAchieved = equity >= 100;
     ev = potOdds > 0 && equity > 0 ? winChance * winAmount - loseChance * callAmount : 0;
   }
