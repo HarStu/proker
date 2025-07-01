@@ -311,3 +311,239 @@ export function calculateResult({
     canShowFullResults
   };
 }
+
+export interface PokerScenario {
+  holeCards: Card[];
+  boardCards: Card[];
+  targetHand: HandRanking;
+  outs: number;
+  potAmount: number;
+  callAmount: number;
+  potOdds: number;
+  equity: number;
+  ev: number;
+  description: string;
+}
+
+export function generateScenario(): PokerScenario {
+  const deck = generateDeck();
+  const holeCards: Card[] = [];
+  const boardCards: Card[] = [];
+
+  // Draw 2 hole cards
+  for (let i = 0; i < 2; i++) {
+    holeCards.push(deck.splice(0, 1)[0]);
+  }
+
+  // Draw 3-4 board cards (randomly choose 3 or 4)
+  const boardCardCount = Math.random() < 0.5 ? 3 : 4;
+  for (let i = 0; i < boardCardCount; i++) {
+    boardCards.push(deck.splice(0, 1)[0]);
+  }
+
+  // Helper function to check if hole cards are involved in a hand
+  function areHoleCardsInvolved(handType: HandRanking): boolean {
+    const allCards = [...holeCards, ...boardCards];
+    const holeCardRanks = holeCards.map(c => c.rank);
+    const holeCardSuits = holeCards.map(c => c.suit);
+
+    // Count occurrences
+    const rankCounts = new Map<Rank, number>();
+    const suitCounts = new Map<Suit, number>();
+    allCards.forEach(card => {
+      rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+      suitCounts.set(card.suit, (suitCounts.get(card.suit) || 0) + 1);
+    });
+
+    switch (handType) {
+      case "Three of a Kind": {
+        // Check if either hole card is part of a pair that could become trips
+        for (const holeCard of holeCards) {
+          if ((rankCounts.get(holeCard.rank) || 0) >= 2) {
+            return true;
+          }
+        }
+        return false;
+      }
+      case "Straight": {
+        // Check if hole cards are part of a straight draw
+        const allRanks = Array.from(new Set(allCards.map(c => c.rank))).sort((a, b) => a - b);
+        for (let i = 0; i <= allRanks.length - 4; i++) {
+          const straightRanks = allRanks.slice(i, i + 5);
+          if (straightRanks.length === 5 && straightRanks.every((_, idx) =>
+            straightRanks[idx] === allRanks[i] + idx ||
+            (i === 0 && allRanks.includes(14) && allRanks.includes(2) && allRanks.includes(3) && allRanks.includes(4) && allRanks.includes(5))
+          )) {
+            // Check if any hole card is in this straight
+            return holeCardRanks.some(rank => straightRanks.includes(rank));
+          }
+        }
+        return false;
+      }
+      case "Flush": {
+        // Check if hole cards are part of a flush draw
+        for (const suit of holeCardSuits) {
+          if ((suitCounts.get(suit) || 0) >= 4) {
+            return true;
+          }
+        }
+        return false;
+      }
+      case "Full House": {
+        // Check if hole cards are part of trips or pair that could form full house
+        for (const holeCard of holeCards) {
+          if ((rankCounts.get(holeCard.rank) || 0) >= 2) {
+            return true;
+          }
+        }
+        return false;
+      }
+      case "Four of a Kind": {
+        // Check if hole cards are part of trips that could become quads
+        for (const holeCard of holeCards) {
+          if ((rankCounts.get(holeCard.rank) || 0) >= 3) {
+            return true;
+          }
+        }
+        return false;
+      }
+      case "Straight Flush": {
+        // Check if hole cards are part of a straight flush draw
+        for (const suit of holeCardSuits) {
+          const suited = allCards.filter(card => card.suit === suit);
+          if (suited.length >= 4) {
+            const suitedRanks = Array.from(new Set(suited.map(c => c.rank))).sort((a, b) => a - b);
+            for (let i = 0; i <= suitedRanks.length - 4; i++) {
+              const straightRanks = suitedRanks.slice(i, i + 5);
+              if (straightRanks.length === 5 && straightRanks.every((_, idx) =>
+                straightRanks[idx] === suitedRanks[i] + idx
+              )) {
+                return holeCardRanks.some(rank => straightRanks.includes(rank));
+              }
+            }
+          }
+        }
+        return false;
+      }
+      default:
+        return false;
+    }
+  }
+
+  // Weighted hand selection based on relative frequency
+  // Weights are approximate relative frequencies in poker
+  const handWeights: { hand: HandRanking; weight: number }[] = [
+    { hand: "Three of a Kind", weight: 25 },    // Most common
+    { hand: "Straight", weight: 25 },              // Common
+    { hand: "Flush", weight: 25 },           // Common
+    { hand: "Full House", weight: 10 },         // Less common
+    { hand: "Four of a Kind", weight: 4 },      // Rare
+    { hand: "Straight Flush", weight: 1 }       // Very rare
+  ];
+
+  // Create weighted array for random selection
+  const weightedHands: HandRanking[] = [];
+  handWeights.forEach(({ hand, weight }) => {
+    for (let i = 0; i < weight; i++) {
+      weightedHands.push(hand);
+    }
+  });
+
+  // Try hands in weighted order until we find a valid one
+  let bestHand: HandRanking | null = null;
+  let maxOuts = 0;
+
+  // Shuffle the weighted hands to add randomness while maintaining weights
+  const shuffledHands = [...weightedHands].sort(() => Math.random() - 0.5);
+
+  for (const hand of shuffledHands) {
+    const outs = countOuts(holeCards, boardCards, hand, deck);
+    // Only consider hands where hole cards are actually involved
+    if (outs > maxOuts && areHoleCardsInvolved(hand)) {
+      maxOuts = outs;
+      bestHand = hand;
+      // Don't break here - continue to find the best hand among valid options
+    }
+  }
+
+  // If no valid draw found, try again recursively
+  if (!bestHand || maxOuts === 0) {
+    return generateScenario();
+  }
+
+  // Generate diverse pot and call amounts
+  // Pot ranges: small ($50-$300), medium ($300-$1000), large ($1000-$3000), huge ($3000-$10000)
+  const potRanges = [
+    { min: 50, max: 300, weight: 30 },
+    { min: 300, max: 1000, weight: 40 },
+    { min: 1000, max: 3000, weight: 20 },
+    { min: 3000, max: 10000, weight: 10 }
+  ];
+
+  // Call ranges: small ($10-$50), medium ($50-$200), large ($200-$500), huge ($500-$1500)
+  const callRanges = [
+    { min: 10, max: 50, weight: 25 },
+    { min: 50, max: 200, weight: 35 },
+    { min: 200, max: 500, weight: 25 },
+    { min: 500, max: 1500, weight: 15 }
+  ];
+
+  // Select pot range
+  const potRangeWeights = potRanges.map(r => r.weight);
+  const potRangeIndex = selectWeightedRandom(potRangeWeights);
+  const selectedPotRange = potRanges[potRangeIndex];
+  const potAmount = Math.floor(Math.random() * (selectedPotRange.max - selectedPotRange.min + 1)) + selectedPotRange.min;
+
+  // Select call range
+  const callRangeWeights = callRanges.map(r => r.weight);
+  const callRangeIndex = selectWeightedRandom(callRangeWeights);
+  const selectedCallRange = callRanges[callRangeIndex];
+  const callAmount = Math.floor(Math.random() * (selectedCallRange.max - selectedCallRange.min + 1)) + selectedCallRange.min;
+
+  // Calculate financial metrics
+  const cardsToSee = Math.max(0, 5 - boardCards.length);
+  const equity = calculateEquity(maxOuts, cardsToSee);
+  const winAmount = potAmount + callAmount;
+  const potOdds = callAmount > 0 && potAmount > 0 ? (winAmount / callAmount) : 0;
+  const winChance = equity / 100;
+  const loseChance = 1 - winChance;
+  const ev = potOdds > 0 && equity > 0 ? winChance * winAmount - loseChance * callAmount : 0;
+
+  // If EV is zero or negative, try again recursively
+  if (ev <= 0) {
+    return generateScenario();
+  }
+
+  // Generate description
+  const holeCardDesc = holeCards.map(card => `${card.rank}${card.suit}`).join(' ');
+  const boardCardDesc = boardCards.map(card => `${card.rank}${card.suit}`).join(' ');
+  const description = `You have ${holeCardDesc} with ${boardCardDesc} on the board. Drawing for ${bestHand} with ${maxOuts} outs.`;
+
+  return {
+    holeCards,
+    boardCards,
+    targetHand: bestHand,
+    outs: maxOuts,
+    potAmount,
+    callAmount,
+    potOdds,
+    equity,
+    ev,
+    description
+  };
+}
+
+// Helper function for weighted random selection
+function selectWeightedRandom(weights: number[]): number {
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let random = Math.random() * totalWeight;
+
+  for (let i = 0; i < weights.length; i++) {
+    random -= weights[i];
+    if (random <= 0) {
+      return i;
+    }
+  }
+
+  return weights.length - 1; // Fallback
+}
