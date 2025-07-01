@@ -87,166 +87,26 @@ export default function Practice() {
 
   // Decision Phase Component
   const DecisionView = () => (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+    <View className="flex-1">
       {/* Header */}
-      <View className="mb-8">
-        <Text className="text-2xl font-bold text-center mb-3">Call Practice</Text>
-        <Text className="text-lg text-center text-gray-700">Count your outs and decide: Call or Fold?</Text>
+      <View className="pt-16 px-4 pb-4">
+        <Text className="text-2xl font-bold text-center mb-2">Call Practice</Text>
+        <Text className="text-sm text-center text-gray-600">Count your outs and decide: Call or Fold?</Text>
       </View>
 
-      {/* Scenario Card */}
-      <View className="bg-white rounded-lg p-6 mb-6 shadow-lg">
-        {/* Hole Cards */}
-        <View className="mb-8">
-          <Text className="text-lg font-semibold mb-4">Your Hole Cards:</Text>
-          <View className="flex-row justify-center">
-            {scenario.holeCards.map((card, index) => {
-              const { rank, suit } = formatCard(card);
-              return (
-                <View key={index} className="bg-white px-4 py-3 rounded-lg border-2 border-gray-300 shadow-sm" style={{ marginRight: index < scenario.holeCards.length - 1 ? 8 : 0 }}>
-                  <Text className="text-2xl font-bold text-center">
-                    <Text className="text-black">{rank}</Text>
-                    <Text className={getSuitColor(suit)}>{suit}</Text>
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Board Cards */}
-        <View className="mb-8">
-          <Text className="text-lg font-semibold mb-4">Board:</Text>
-          <View className="flex-row justify-center">
-            {scenario.boardCards.map((card, index) => {
-              const { rank, suit } = formatCard(card);
-              return (
-                <View key={index} className="bg-white px-4 py-3 rounded-lg border-2 border-gray-300 shadow-sm" style={{ marginRight: index < scenario.boardCards.length - 1 ? 6 : 0 }}>
-                  <Text className="text-2xl font-bold text-center">
-                    <Text className="text-black">{rank}</Text>
-                    <Text className={getSuitColor(suit)}>{suit}</Text>
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Pot and Call Info */}
-        <View className="mb-8 bg-blue-50 p-4 rounded-lg">
-          <Text className="text-lg font-semibold mb-3 text-center">Action to You:</Text>
-          <View className="flex-row justify-between">
-            <Text className="text-xl">Pot Size: <Text className="font-bold text-green-700">${scenario.potAmount}</Text></Text>
-            <Text className="text-xl">Call: <Text className="font-bold text-red-700">${scenario.callAmount}</Text></Text>
-          </View>
-        </View>
-
-        {/* Decision Buttons */}
-        <View className="flex-row gap-4">
-          <Pressable
-            className="flex-1 bg-green-600 py-4 px-6 rounded-lg"
-            style={{ marginRight: 6 }}
-            onPress={() => handleDecision('call')}
-          >
-            <Text className="text-white font-bold text-xl text-center">CALL</Text>
-          </Pressable>
-          <Pressable
-            className="flex-1 bg-red-600 py-4 px-6 rounded-lg"
-            style={{ marginLeft: 6 }}
-            onPress={() => handleDecision('fold')}
-          >
-            <Text className="text-white font-bold text-xl text-center">FOLD</Text>
-          </Pressable>
-        </View>
-      </View>
-    </ScrollView>
-  );
-
-  // Results Phase Component
-  const ResultsView = () => (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
-      {/* Header with Result */}
-      <View className="mb-4">
-        <Text className="text-2xl font-bold text-center mb-2">Results</Text>
-        <View className={`p-3 rounded-lg ${isCorrect ? 'bg-green-200' : 'bg-red-200'}`}>
-          <Text className={`text-lg font-bold text-center ${isCorrect ? 'text-green-800' : 'text-red-800'}`}>
-            {isCorrect ? '✅ CORRECT!' : '❌ INCORRECT'}
-          </Text>
-          <Text className="text-center text-base">
-            You: <Text className="font-bold">{playerDecision?.toUpperCase()}</Text> | Correct: <Text className="font-bold">{scenario.correctDecision.toUpperCase()}</Text>
-          </Text>
-        </View>
-      </View>
-
-      {/* Compact Scenario Display */}
-      <View className="bg-white rounded-lg p-4 mb-4 shadow-lg">
-        {/* Cards in one row */}
-        <View className="mb-3">
-          <Text className="text-sm font-semibold mb-2">Hand:
-            {scenario.holeCards.map((card, index) => {
-              const { rank, suit } = formatCard(card);
-              return (
-                <Text key={index} className="ml-1">
-                  <Text className="text-black">{rank}</Text>
-                  <Text className={getSuitColor(suit)}>{suit}</Text>
-                </Text>
-              );
-            })}
-            {' | '}Board:
-            {scenario.boardCards.map((card, index) => {
-              const { rank, suit } = formatCard(card);
-              return (
-                <Text key={index} className="ml-1">
-                  <Text className="text-black">{rank}</Text>
-                  <Text className={getSuitColor(suit)}>{suit}</Text>
-                </Text>
-              );
-            })}
-          </Text>
-          <Text className="text-sm">Pot: <Text className="font-bold">${scenario.potAmount}</Text> | Call: <Text className="font-bold">${scenario.callAmount}</Text></Text>
-        </View>
-      </View>
-
-      {/* Compact Analysis */}
-      <View className="bg-white rounded-lg p-4 mb-4 shadow-lg">
-        <Text className="text-lg font-bold mb-2">Analysis</Text>
-
-        {/* Outs Summary */}
-        <View className="mb-3">
-          <Text className="text-sm">
-            <Text className="font-semibold">Total Outs: {scenario.outs}</Text>
-            {scenario.outBreakdown.primaryOuts > 0 && (
-              <Text> | Primary: {scenario.outBreakdown.primaryOuts} ({scenario.outBreakdown.primaryType})</Text>
-            )}
-            {scenario.outBreakdown.secondaryOuts > 0 && (
-              <Text> | Secondary: {scenario.outBreakdown.secondaryOuts} ({scenario.outBreakdown.secondaryTypes.join(', ')})</Text>
-            )}
-          </Text>
-        </View>
-
-        {/* Compact Out Cards Display */}
-        {(scenario.outCards.primary.length > 0 || scenario.outCards.secondary.length > 0) && (
-          <View className="mb-3">
-            <Text className="text-sm font-semibold mb-1">Your Outs:</Text>
-            <View className="flex-row flex-wrap">
-              {/* Primary Outs */}
-              {scenario.outCards.primary.slice(0, 12).map((card, index) => {
+      {/* Content */}
+      <View className="flex-1 justify-end p-4">
+        {/* Scenario Card */}
+        <View className="bg-white rounded-lg p-6 shadow-lg">
+          {/* Hole Cards */}
+          <View className="mb-8">
+            <Text className="text-lg font-semibold mb-4">Your Hole Cards:</Text>
+            <View className="flex-row justify-center gap-3">
+              {scenario.holeCards.map((card, index) => {
                 const { rank, suit } = formatCard(card);
                 return (
-                  <View key={`primary-${index}`} className="px-1 py-0.5 rounded border mr-1 mb-1 bg-blue-100 border-blue-300">
-                    <Text className="text-xs font-bold">
-                      <Text className="text-black">{rank}</Text>
-                      <Text className={getSuitColor(suit)}>{suit}</Text>
-                    </Text>
-                  </View>
-                );
-              })}
-              {/* Secondary Outs */}
-              {scenario.outCards.secondary.slice(0, 6).map((card, index) => {
-                const { rank, suit } = formatCard(card);
-                return (
-                  <View key={`secondary-${index}`} className="px-1 py-0.5 rounded border mr-1 mb-1 bg-yellow-100 border-yellow-300">
-                    <Text className="text-xs font-bold">
+                  <View key={index} className="bg-white px-4 py-3 rounded-lg border-2 border-gray-300 shadow-sm">
+                    <Text className="text-2xl font-bold text-center">
                       <Text className="text-black">{rank}</Text>
                       <Text className={getSuitColor(suit)}>{suit}</Text>
                     </Text>
@@ -255,48 +115,193 @@ export default function Practice() {
               })}
             </View>
           </View>
-        )}
 
-        {/* Math and Explanation */}
-        <View className="mb-3">
-          <Text className="text-sm">
-            <Text className="font-semibold">Equity: {scenario.equity.toFixed(1)}%</Text> |
-            <Text className="font-semibold"> Pot Odds: {scenario.potOdds.toFixed(1)}%</Text>
-          </Text>
-        </View>
+          {/* Board Cards */}
+          <View className="mb-8">
+            <Text className="text-lg font-semibold mb-4">Board:</Text>
+            <View className="flex-row justify-center gap-3">
+              {scenario.boardCards.map((card, index) => {
+                const { rank, suit } = formatCard(card);
+                return (
+                  <View key={index} className="bg-white px-4 py-3 rounded-lg border-2 border-gray-300 shadow-sm">
+                    <Text className="text-2xl font-bold text-center">
+                      <Text className="text-black">{rank}</Text>
+                      <Text className={getSuitColor(suit)}>{suit}</Text>
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
 
-        <View className="bg-gray-50 p-2 rounded">
-          <Text className="text-xs text-gray-700">
-            {scenario.correctDecision === 'call'
-              ? `Equity (${scenario.equity.toFixed(1)}%) > Pot Odds (${scenario.potOdds.toFixed(1)}%) = Profitable Call`
-              : `Equity (${scenario.equity.toFixed(1)}%) < Pot Odds (${scenario.potOdds.toFixed(1)}%) = Fold`
-            }
-          </Text>
+          {/* Pot and Call Info */}
+          <View className="mb-8 bg-blue-50 p-4 rounded-lg">
+            <Text className="text-lg font-semibold mb-3 text-center">Action to You:</Text>
+            <View className="flex-row justify-between">
+              <Text className="text-xl">Pot Size: <Text className="font-bold text-green-700">${scenario.potAmount}</Text></Text>
+              <Text className="text-xl">Call: <Text className="font-bold text-red-700">${scenario.callAmount}</Text></Text>
+            </View>
+          </View>
+
+          {/* Decision Buttons */}
+          <View className="flex-row gap-4">
+            <Pressable
+              className="flex-1 bg-green-600 py-4 px-6 rounded-lg"
+              onPress={() => handleDecision('call')}
+            >
+              <Text className="text-white font-bold text-xl text-center">CALL</Text>
+            </Pressable>
+            <Pressable
+              className="flex-1 bg-red-600 py-4 px-6 rounded-lg"
+              onPress={() => handleDecision('fold')}
+            >
+              <Text className="text-white font-bold text-xl text-center">FOLD</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
+    </View>
+  );
 
-      {/* Try Again Button */}
-      <Pressable
-        className="bg-blue-600 py-3 px-6 rounded-lg"
-        onPress={resetToNewScenario}
-      >
-        <Text className="text-white font-bold text-lg text-center">Try New Scenario</Text>
-      </Pressable>
-    </ScrollView>
+  // Results Phase Component
+  const ResultsView = () => (
+    <View className="flex-1">
+      {/* Header */}
+      <View className="pt-16 px-4 pb-4">
+        <Text className="text-2xl font-bold text-center mb-2">Results</Text>
+        <Text className="text-sm text-center text-gray-600">Review your decision and analysis</Text>
+      </View>
+
+      {/* Content */}
+      <View className="flex-1 justify-end p-4">
+        {/* Result Status */}
+        <View className="mb-4">
+          <View className={`p-3 rounded-lg ${isCorrect ? 'bg-green-200' : 'bg-red-200'}`}>
+            <Text className={`text-lg font-bold text-center ${isCorrect ? 'text-green-800' : 'text-red-800'}`}>
+              {isCorrect ? '✅ CORRECT!' : '❌ INCORRECT'}
+            </Text>
+            <Text className="text-center text-base">
+              You: <Text className="font-bold">{playerDecision?.toUpperCase()}</Text> | Correct: <Text className="font-bold">{scenario.correctDecision.toUpperCase()}</Text>
+            </Text>
+          </View>
+        </View>
+
+        {/* Compact Scenario Display */}
+        <View className="bg-white rounded-lg p-4 mb-4 shadow-lg">
+          {/* Cards in one row */}
+          <View className="mb-3">
+            <Text className="text-sm font-semibold mb-2">Hand:
+              {scenario.holeCards.map((card, index) => {
+                const { rank, suit } = formatCard(card);
+                return (
+                  <Text key={index} className="ml-1">
+                    <Text className="text-black">{rank}</Text>
+                    <Text className={getSuitColor(suit)}>{suit}</Text>
+                  </Text>
+                );
+              })}
+              {' | '}Board:
+              {scenario.boardCards.map((card, index) => {
+                const { rank, suit } = formatCard(card);
+                return (
+                  <Text key={index} className="ml-1">
+                    <Text className="text-black">{rank}</Text>
+                    <Text className={getSuitColor(suit)}>{suit}</Text>
+                  </Text>
+                );
+              })}
+            </Text>
+            <Text className="text-sm">Pot: <Text className="font-bold">${scenario.potAmount}</Text> | Call: <Text className="font-bold">${scenario.callAmount}</Text></Text>
+          </View>
+        </View>
+
+        {/* Compact Analysis */}
+        <View className="bg-white rounded-lg p-4 mb-4 shadow-lg">
+          <Text className="text-lg font-bold mb-2">Analysis</Text>
+
+          {/* Outs Summary */}
+          <View className="mb-3">
+            <Text className="text-sm">
+              <Text className="font-semibold">Total Outs: {scenario.outs}</Text>
+              {scenario.outBreakdown.primaryOuts > 0 && (
+                <Text> | Primary: {scenario.outBreakdown.primaryOuts} ({scenario.outBreakdown.primaryType})</Text>
+              )}
+              {scenario.outBreakdown.secondaryOuts > 0 && (
+                <Text> | Secondary: {scenario.outBreakdown.secondaryOuts} ({scenario.outBreakdown.secondaryTypes.join(', ')})</Text>
+              )}
+            </Text>
+          </View>
+
+          {/* Compact Out Cards Display */}
+          {(scenario.outCards.primary.length > 0 || scenario.outCards.secondary.length > 0) && (
+            <View className="mb-3">
+              <Text className="text-sm font-semibold mb-1">Your Outs:</Text>
+              <View className="flex-row flex-wrap">
+                {/* Primary Outs */}
+                {scenario.outCards.primary.slice(0, 12).map((card, index) => {
+                  const { rank, suit } = formatCard(card);
+                  return (
+                    <View key={`primary-${index}`} className="px-1 py-0.5 rounded border mr-1 mb-1 bg-blue-100 border-blue-300">
+                      <Text className="text-xs font-bold">
+                        <Text className="text-black">{rank}</Text>
+                        <Text className={getSuitColor(suit)}>{suit}</Text>
+                      </Text>
+                    </View>
+                  );
+                })}
+                {/* Secondary Outs */}
+                {scenario.outCards.secondary.slice(0, 6).map((card, index) => {
+                  const { rank, suit } = formatCard(card);
+                  return (
+                    <View key={`secondary-${index}`} className="px-1 py-0.5 rounded border mr-1 mb-1 bg-yellow-100 border-yellow-300">
+                      <Text className="text-xs font-bold">
+                        <Text className="text-black">{rank}</Text>
+                        <Text className={getSuitColor(suit)}>{suit}</Text>
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Math and Explanation */}
+          <View className="mb-3">
+            <Text className="text-sm">
+              <Text className="font-semibold">Equity: {scenario.equity.toFixed(1)}%</Text> |
+              <Text className="font-semibold"> Pot Odds: {scenario.potOdds.toFixed(1)}%</Text>
+            </Text>
+          </View>
+
+          <View className="bg-gray-50 p-2 rounded">
+            <Text className="text-xs text-gray-700">
+              {scenario.correctDecision === 'call'
+                ? `Equity (${scenario.equity.toFixed(1)}%) > Pot Odds (${scenario.potOdds.toFixed(1)}%) = Profitable Call`
+                : `Equity (${scenario.equity.toFixed(1)}%) < Pot Odds (${scenario.potOdds.toFixed(1)}%) = Fold`
+              }
+            </Text>
+          </View>
+        </View>
+
+        {/* Try Again Button */}
+        <Pressable
+          className="bg-blue-600 py-3 px-6 rounded-lg"
+          onPress={resetToNewScenario}
+        >
+          <Text className="text-white font-bold text-lg text-center">Try New Scenario</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 
   // Main render with sliding stack
   return (
     <View className="flex-1 bg-green-100">
-      <View style={{ flex: 1, overflow: 'hidden' }}>
+      <View className="flex-1 overflow-hidden">
         {/* Decision View */}
         <Animated.View
+          className="absolute inset-0"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
             transform: [{ translateX: slideAnim }],
           }}
         >
@@ -305,12 +310,8 @@ export default function Practice() {
 
         {/* Results View */}
         <Animated.View
+          className="absolute inset-0"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
             transform: [{ translateX: Animated.add(slideAnim, screenWidth) }],
           }}
         >

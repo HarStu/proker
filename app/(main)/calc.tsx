@@ -37,15 +37,29 @@ export default function Calc() {
 
   return (
     <View className="flex-1 bg-green-100">
+      {/* Header */}
       <View className="pt-16 px-4 pb-4">
-        <DisplayResult result={result} />
-        <BoardSetup onChange={handleBoardChange} />
-        <HandPicker onHandSelected={setTargetHand} />
-        <CashSelector onChange={(pot, call, valid) => {
-          setPotAmount(pot);
-          setCallAmount(call);
-          setIsCashValid(valid);
-        }} />
+        <Text className="text-2xl font-bold text-center mb-2">Poker Calculator</Text>
+        <Text className="text-sm text-center text-gray-600">Calculate your odds and expected value</Text>
+      </View>
+
+      {/* Content */}
+      <View className="flex-1 justify-end px-4 pb-8">
+        {/* Results Card */}
+        <View className="bg-white rounded-lg p-4 shadow-lg mb-4">
+          <DisplayResult result={result} />
+        </View>
+
+        {/* Setup Sections */}
+        <View className="bg-white rounded-lg p-4 shadow-lg">
+          <BoardSetup onChange={handleBoardChange} />
+          <HandPicker onHandSelected={setTargetHand} />
+          <CashSelector onChange={(pot, call, valid) => {
+            setPotAmount(pot);
+            setCallAmount(call);
+            setIsCashValid(valid);
+          }} />
+        </View>
       </View>
     </View>
   );
