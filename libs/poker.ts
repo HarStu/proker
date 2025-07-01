@@ -55,266 +55,259 @@ export function calculatePotOdds(potAmount: number, callAmount: number): number 
   return (callAmount / (potAmount + callAmount)) * 100;
 }
 
-// Detect what hand we currently have
-export function getCurrentHandRanking(cards: Card[]): HandRanking {
-  if (cards.length < 5) {
-    // For incomplete hands, check what we have so far
-    if (hasFourOfAKind(cards)) return "Four of a Kind";
-    if (hasFullHouse(cards)) return "Full House";
-    if (hasFlush(cards)) return "Flush";
-    if (hasStraight(cards)) return "Straight";
-    if (hasThreeOfAKind(cards)) return "Three of a Kind";
-    if (hasTwoPair(cards)) return "Two Pair";
-    if (hasPair(cards)) return "Pair";
-    return "High Card";
-  }
-
-  // Full 5-card hand evaluation
-  if (isRoyalFlush(cards)) return "Royal Flush";
-  if (isStraightFlush(cards)) return "Straight Flush";
-  if (hasFourOfAKind(cards)) return "Four of a Kind";
-  if (hasFullHouse(cards)) return "Full House";
-  if (hasFlush(cards)) return "Flush";
-  if (hasStraight(cards)) return "Straight";
-  if (hasThreeOfAKind(cards)) return "Three of a Kind";
-  if (hasTwoPair(cards)) return "Two Pair";
-  if (hasPair(cards)) return "Pair";
-  return "High Card";
-}
-
 // Count outs for specific hand types
 export function countOuts(holeCards: Card[], boardCards: Card[], targetHand: HandRanking, remainingDeck: Deck): number {
-  // Must have exactly 2 hole cards
   if (holeCards.length !== 2) return 0;
-
-  // If any flop cards are selected, all 3 must be selected
   if (boardCards.length > 0 && boardCards.length < 3) return 0;
-
   const allKnownCards = [...holeCards, ...boardCards];
-  const currentHand = getCurrentHandRanking(allKnownCards);
 
-  // If we already have the target hand or better, we have 100% equity
-  const handRankings: HandRanking[] = [
-    "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight",
-    "Flush", "Full House", "Four of a Kind", "Straight Flush", "Royal Flush"
-  ];
-
-  const currentRank = handRankings.indexOf(currentHand);
-  const targetRank = handRankings.indexOf(targetHand);
-
-  if (currentRank >= targetRank) {
-    // We already have the target hand or better - return outs for 100% equity
-    const cardsToSee = 5 - boardCards.length;
-    if (cardsToSee === 2) return 25; // 25 outs * 4 = 100%
-    if (cardsToSee === 1) return 50; // 50 outs * 2 = 100%
-    return 25; // Default to 100% equity
+  // Helper to count cards in deck that complete a hand
+  function countCompletingCards(check: (card: Card) => boolean): number {
+    return remainingDeck.filter(check).length;
   }
 
-  const suits = new Map<Suit, number>();
-  const ranks = new Map<Rank, number>();
-
-  // Count suits and ranks
+  // Helper to count rank/suit occurrences
+  const rankCounts = new Map<Rank, number>();
+  const suitCounts = new Map<Suit, number>();
   allKnownCards.forEach(card => {
-    suits.set(card.suit, (suits.get(card.suit) || 0) + 1);
-    ranks.set(card.rank, (ranks.get(card.rank) || 0) + 1);
+    rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+    suitCounts.set(card.suit, (suitCounts.get(card.suit) || 0) + 1);
   });
 
-  let outs = 0;
-
-  switch (targetHand) {
-    case "Pair":
-      // If no pair yet, count cards that would pair with hole cards
-      if (!hasPair(allKnownCards)) {
-        for (const holeCard of holeCards) {
-          // 3 cards of same rank remain (4 total - 1 in hand)
-          outs += Math.max(0, 3 - (ranks.get(holeCard.rank) || 0) + 1);
+  // Helper for straight draws
+  function isOneAwayFromStraight(cards: Card[]): { neededRanks: Rank[] } | null {
+    const ranks = Array.from(new Set(cards.map(c => c.rank))).sort((a, b) => a - b);
+    for (let i = 0; i <= ranks.length - 4; i++) {
+      let gap = 0;
+      let missing: Rank[] = [];
+      for (let j = 0; j < 5; j++) {
+        const rank = (ranks[i] + j) as Rank;
+        if (!ranks.includes(rank)) {
+          gap++;
+          missing.push(rank as Rank);
         }
       }
-      break;
+      if (gap === 1) return { neededRanks: missing };
+    }
+    // Wheel straight
+    if ([14, 2, 3, 4].every(r => ranks.includes(r as Rank))) {
+      if (!ranks.includes(5)) return { neededRanks: [5 as Rank] };
+    }
+    return null;
+  }
 
-    case "Two Pair":
-      if (hasPair(allKnownCards) && !hasTwoPair(allKnownCards)) {
-        // Need to pair the other hole card
-        const pairedRank = getPairedRank(allKnownCards);
-        for (const holeCard of holeCards) {
-          if (holeCard.rank !== pairedRank) {
-            outs += Math.max(0, 3 - (ranks.get(holeCard.rank) || 0) + 1);
+  // Helper for flush draws
+  function isOneAwayFromFlush(): Suit | null {
+    for (const [suit, count] of suitCounts) {
+      if (count === 4) return suit;
+    }
+    return null;
+  }
+
+  // Helper for full house draws
+  function isOneAwayFromFullHouse(): { pairRank: Rank, tripsRank: Rank } | null {
+    let pair: Rank | null = null;
+    let trips: Rank | null = null;
+    for (const [rank, count] of rankCounts) {
+      if (count === 3) trips = rank;
+      else if (count === 2) pair = rank;
+    }
+    if ((pair && !trips) || (trips && !pair)) return { pairRank: pair!, tripsRank: trips! };
+    return null;
+  }
+
+  // Helper to get Royal Flush ranks as Rank[]
+  function getRoyalFlushRanks(): Rank[] {
+    return [10, 11, 12, 13, 14] as Rank[];
+  }
+
+  // Main logic for each hand type
+  switch (targetHand) {
+    case "Pair": {
+      // One away if you have one of a rank in hand/board
+      for (const holeCard of holeCards) {
+        if ((rankCounts.get(holeCard.rank) || 0) === 1) {
+          return countCompletingCards(card => card.rank === holeCard.rank);
+        }
+      }
+      return 0;
+    }
+    case "Two Pair": {
+      // One away if you have a pair and another single
+      let pairs = 0, singles: Rank[] = [];
+      for (const [rank, count] of rankCounts) {
+        if (count === 2) pairs++;
+        if (count === 1) singles.push(rank);
+      }
+      if (pairs === 1 && singles.length >= 1) {
+        // Need to pair one of the singles
+        return singles.reduce((sum, rank) => sum + countCompletingCards(card => card.rank === (rank as Rank)), 0);
+      }
+      return 0;
+    }
+    case "Three of a Kind": {
+      // One away if you have a pair
+      for (const [rank, count] of rankCounts) {
+        if (count === 2) {
+          return countCompletingCards(card => card.rank === rank);
+        }
+      }
+      return 0;
+    }
+    case "Straight": {
+      // One away if you have an open-ended or gutshot straight draw
+      const straightDraw = isOneAwayFromStraight(allKnownCards);
+      if (straightDraw) {
+        return straightDraw.neededRanks.reduce((sum, rank) => sum + countCompletingCards(card => card.rank === (rank as Rank)), 0);
+      }
+      return 0;
+    }
+    case "Flush": {
+      // One away if you have 4 of a suit
+      const suit = isOneAwayFromFlush();
+      if (suit) {
+        return countCompletingCards(card => card.suit === suit);
+      }
+      return 0;
+    }
+    case "Full House": {
+      // One away if you have trips or a pair
+      const fh = isOneAwayFromFullHouse();
+      if (fh) {
+        if (fh.tripsRank) {
+          // Need a pair
+          return Array.from(rankCounts.keys()).reduce((sum, rank) => {
+            if (rank !== fh.tripsRank) {
+              return sum + countCompletingCards(card => card.rank === (rank as Rank));
+            }
+            return sum;
+          }, 0);
+        } else if (fh.pairRank) {
+          // Need to hit trips
+          return countCompletingCards(card => card.rank === fh.pairRank);
+        }
+      }
+      return 0;
+    }
+    case "Four of a Kind": {
+      // One away if you have trips
+      for (const [rank, count] of rankCounts) {
+        if (count === 3) {
+          return countCompletingCards(card => card.rank === rank);
+        }
+      }
+      return 0;
+    }
+    case "Straight Flush": {
+      // One away if you have 4 to a straight flush
+      for (const suit of ["h", "d", "c", "s"] as Suit[]) {
+        const suited = allKnownCards.filter(card => card.suit === suit);
+        if (suited.length >= 4) {
+          const straightDraw = isOneAwayFromStraight(suited);
+          if (straightDraw) {
+            return straightDraw.neededRanks.reduce((sum, rank) => sum + countCompletingCards(card => card.rank === (rank as Rank) && card.suit === suit), 0);
           }
         }
       }
-      break;
-
-    case "Three of a Kind":
-      // Count trips possibilities
-      for (const [rank, count] of ranks) {
-        if (count === 2) {
-          outs += Math.max(0, 2); // 2 more cards of same rank
+      return 0;
+    }
+    case "Royal Flush": {
+      // One away if you have 4 to a royal flush
+      for (const suit of ["h", "d", "c", "s"] as Suit[]) {
+        const needed = getRoyalFlushRanks();
+        const neededSet = new Set<number>(needed);
+        const suited = allKnownCards.filter(card => card.suit === suit && neededSet.has(card.rank));
+        if (suited.length === 4) {
+          let sum = 0;
+          for (const rank of needed) {
+            sum += countCompletingCards(card => card.rank === rank && card.suit === suit);
+          }
+          return sum;
         }
       }
-      break;
-
-    case "Straight":
-      outs = countStraightOuts(allKnownCards, remainingDeck);
-      break;
-
-    case "Flush":
-      // Count flush draws
-      for (const [suit, count] of suits) {
-        if (count >= 4) {
-          // Count remaining cards of this suit
-          outs += remainingDeck.filter(card => card.suit === suit).length;
-        }
-      }
-      break;
-
+      return 0;
+    }
     default:
-      // For other hands, return a conservative estimate
-      // Preflop: more outs available, postflop: fewer outs
-      if (boardCards.length === 0) {
-        // Preflop - more possibilities
-        outs = Math.max(0, 8 - handRankings.indexOf(targetHand) * 2);
-      } else {
-        // Postflop - fewer possibilities
-        outs = Math.max(0, 6 - boardCards.length * 2);
-      }
+      return 0;
   }
-
-  return Math.min(outs, remainingDeck.length);
 }
 
 // Calculate equity percentage based on outs
 export function calculateEquity(outs: number, cardsToSee: number): number {
   if (outs <= 0 || cardsToSee <= 0) return 0;
-
   // Rule of 4 and 2: multiply outs by 4 for turn+river, by 2 for river only
   const multiplier = cardsToSee === 2 ? 4 : cardsToSee === 1 ? 2 : 2;
   return Math.min(outs * multiplier, 100);
 }
 
-// Helper functions
-function hasPair(cards: Card[]): boolean {
-  const ranks = new Map<Rank, number>();
-  cards.forEach(card => {
-    ranks.set(card.rank, (ranks.get(card.rank) || 0) + 1);
-  });
-  return Array.from(ranks.values()).some(count => count >= 2);
+export interface PokerCalcResult {
+  outs: number;
+  potOdds: number;
+  equity: number;
+  ev: number;
+  isDrawAchieved: boolean;
+  isValidSetup: boolean;
+  statusMessages: string[];
+  canShowOuts: boolean;
+  canShowFullResults: boolean;
 }
 
-function hasTwoPair(cards: Card[]): boolean {
-  const ranks = new Map<Rank, number>();
-  cards.forEach(card => {
-    ranks.set(card.rank, (ranks.get(card.rank) || 0) + 1);
-  });
-  const pairs = Array.from(ranks.values()).filter(count => count >= 2);
-  return pairs.length >= 2;
-}
-
-function hasThreeOfAKind(cards: Card[]): boolean {
-  const ranks = new Map<Rank, number>();
-  cards.forEach(card => {
-    ranks.set(card.rank, (ranks.get(card.rank) || 0) + 1);
-  });
-  return Array.from(ranks.values()).some(count => count >= 3);
-}
-
-function hasFourOfAKind(cards: Card[]): boolean {
-  const ranks = new Map<Rank, number>();
-  cards.forEach(card => {
-    ranks.set(card.rank, (ranks.get(card.rank) || 0) + 1);
-  });
-  return Array.from(ranks.values()).some(count => count >= 4);
-}
-
-function hasFullHouse(cards: Card[]): boolean {
-  const ranks = new Map<Rank, number>();
-  cards.forEach(card => {
-    ranks.set(card.rank, (ranks.get(card.rank) || 0) + 1);
-  });
-  const counts = Array.from(ranks.values());
-  return counts.includes(3) && counts.includes(2);
-}
-
-function hasFlush(cards: Card[]): boolean {
-  const suits = new Map<Suit, number>();
-  cards.forEach(card => {
-    suits.set(card.suit, (suits.get(card.suit) || 0) + 1);
-  });
-  return Array.from(suits.values()).some(count => count >= 5);
-}
-
-function hasStraight(cards: Card[]): boolean {
-  if (cards.length < 5) return false;
-  const ranks = Array.from(new Set(cards.map(card => card.rank))).sort((a, b) => a - b);
-
-  // Check for 5 consecutive ranks
-  for (let i = 0; i <= ranks.length - 5; i++) {
-    let consecutive = true;
-    for (let j = 1; j < 5; j++) {
-      if (ranks[i + j] !== ranks[i] + j) {
-        consecutive = false;
-        break;
-      }
-    }
-    if (consecutive) return true;
+export function calculateResult({
+  holeCards,
+  boardCards,
+  remainingDeck,
+  targetHand,
+  potAmount,
+  callAmount,
+  isCashValid
+}: {
+  holeCards: Card[];
+  boardCards: Card[];
+  remainingDeck: Deck;
+  targetHand: string;
+  potAmount: number;
+  callAmount: number;
+  isCashValid: boolean;
+}): PokerCalcResult {
+  const hasRequiredCards = holeCards.length === 2;
+  const hasFlop = boardCards.length >= 3;
+  const hasTargetHand = !!targetHand && targetHand !== "";
+  const canShowOuts = hasRequiredCards && hasFlop && hasTargetHand;
+  const canShowFullResults = canShowOuts && isCashValid && potAmount > 0 && callAmount > 0;
+  const isValidSetup = canShowFullResults;
+  const statusMessages: string[] = [];
+  if (!canShowOuts) {
+    statusMessages.push("Complete setup to see calculation");
+  } else if (!canShowFullResults) {
+    statusMessages.push("Enter pot and call amounts to see full results");
   }
-
-  // Check for A-2-3-4-5 straight
-  if (ranks.includes(14) && ranks.includes(2) && ranks.includes(3) && ranks.includes(4) && ranks.includes(5)) {
-    return true;
-  }
-
-  return false;
-}
-
-function isStraightFlush(cards: Card[]): boolean {
-  return hasStraight(cards) && hasFlush(cards);
-}
-
-function isRoyalFlush(cards: Card[]): boolean {
-  if (!hasFlush(cards)) return false;
-  const ranks = cards.map(card => card.rank).sort((a, b) => a - b);
-  return ranks.includes(10) && ranks.includes(11) && ranks.includes(12) && ranks.includes(13) && ranks.includes(14);
-}
-
-function getPairedRank(cards: Card[]): Rank | null {
-  const ranks = new Map<Rank, number>();
-  cards.forEach(card => {
-    ranks.set(card.rank, (ranks.get(card.rank) || 0) + 1);
-  });
-  for (const [rank, count] of ranks) {
-    if (count >= 2) return rank;
-  }
-  return null;
-}
-
-function countStraightOuts(cards: Card[], remainingDeck: Deck): number {
-  // Simplified straight out counting - would need more complex logic for all cases
-  const ranks = Array.from(new Set(cards.map(card => card.rank))).sort((a, b) => a - b);
   let outs = 0;
-
-  // Check for open-ended straight draws (simplified)
-  if (ranks.length >= 4) {
-    const gaps = [];
-    for (let i = 1; i < ranks.length; i++) {
-      if (ranks[i] - ranks[i - 1] === 1) continue;
-      if (ranks[i] - ranks[i - 1] === 2) gaps.push(ranks[i - 1] + 1);
-    }
-
-    // Count outs for gaps
-    gaps.forEach(missingRank => {
-      outs += remainingDeck.filter(card => card.rank === missingRank as Rank).length;
-    });
-
-    // Add outs for extending the sequence
-    const minRank = Math.min(...ranks);
-    const maxRank = Math.max(...ranks);
-    if (minRank > 2) {
-      outs += remainingDeck.filter(card => card.rank === (minRank - 1) as Rank).length;
-    }
-    if (maxRank < 14) {
-      outs += remainingDeck.filter(card => card.rank === (maxRank + 1) as Rank).length;
-    }
+  let potOdds = 0;
+  let equity = 0;
+  let ev = 0;
+  let isDrawAchieved = false;
+  if (canShowOuts) {
+    outs = countOuts(holeCards, boardCards, targetHand as HandRanking, remainingDeck);
   }
-
-  return outs;
+  if (canShowFullResults) {
+    const cardsToSee = Math.max(0, 5 - boardCards.length);
+    equity = calculateEquity(outs, cardsToSee);
+    const winAmount = potAmount + callAmount;
+    potOdds = callAmount > 0 && potAmount > 0 ? (winAmount / callAmount) : 0;
+    const winChance = equity / 100;
+    const loseChance = 1 - winChance;
+    isDrawAchieved = equity >= 100;
+    ev = potOdds > 0 && equity > 0 ? winChance * winAmount - loseChance * callAmount : 0;
+  }
+  return {
+    outs,
+    potOdds,
+    equity,
+    ev,
+    isDrawAchieved,
+    isValidSetup,
+    statusMessages,
+    canShowOuts,
+    canShowFullResults
+  };
 }
