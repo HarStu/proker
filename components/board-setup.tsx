@@ -97,36 +97,30 @@ export default function BoardSetup({ onChange }: BoardSetupProps) {
   };
 
   return (
-    <View className="p-4">
+    <View>
       {/* Board cards */}
-      <View className="flex-row justify-center mb-8">
-        {/* Flop */}
-        <View>
-          <Text className="text-xs text-center text-black">the flop</Text>
-          <View className="flex-row gap-4">
-            {boardCards.slice(0, 3).map((card, index) => (
-              <View key={index}>
-                {card === null ? (
-                  <CardPicker
-                    deck={deck}
-                    onCardPicked={handleCardPicked(index, false)}
-                  />
-                ) : (
-                  <Pressable
-                    className="w-20 h-28 bg-white border-2 border-gray-300 rounded-xl shadow-md justify-center items-center"
-                    onPress={() => returnCard(card, index, false)}
-                  >
-                    {renderCard(card)}
-                  </Pressable>
-                )}
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Turn */}
-        <View className="ml-8">
-          <Text className="text-xs text-center text-black">the turn</Text>
+      <View className="mb-4">
+        <Text className="text-sm font-semibold mb-2 text-center">Board</Text>
+        <View className="flex-row justify-center gap-2">
+          {/* Flop */}
+          {boardCards.slice(0, 3).map((card, index) => (
+            <View key={index}>
+              {card === null ? (
+                <CardPicker
+                  deck={deck}
+                  onCardPicked={handleCardPicked(index, false)}
+                />
+              ) : (
+                <Pressable
+                  className="bg-white px-3 py-2 rounded-lg border-2 border-gray-300 shadow-sm justify-center items-center"
+                  onPress={() => returnCard(card, index, false)}
+                >
+                  {renderCard(card)}
+                </Pressable>
+              )}
+            </View>
+          ))}
+          {/* Turn */}
           {boardCards.slice(3, 4).map((card, index) => (
             <View key={index}>
               {card === null ? (
@@ -138,12 +132,12 @@ export default function BoardSetup({ onChange }: BoardSetupProps) {
                   />
                 ) : (
                   <View className="w-20 h-28 bg-gray-200 border-2 border-gray-300 rounded-xl opacity-50 justify-center items-center">
-                    <Text className="text-xs text-black">Locked</Text>
+                    <Text className="text-xs text-gray-500">Locked</Text>
                   </View>
                 )
               ) : (
                 <Pressable
-                  className="w-20 h-28 bg-white border-2 border-gray-300 rounded-xl shadow-md justify-center items-center"
+                  className="bg-white px-3 py-2 rounded-lg border-2 border-gray-300 shadow-sm justify-center items-center"
                   onPress={() => returnCard(card, 3, false)}
                 >
                   {renderCard(card)}
@@ -155,9 +149,9 @@ export default function BoardSetup({ onChange }: BoardSetupProps) {
       </View>
 
       {/* Hole cards */}
-      <View>
-        <Text className="text-xs text-center text-black">your cards</Text>
-        <View className="flex-row justify-center gap-4">
+      <View className="mb-4">
+        <Text className="text-sm font-semibold mb-2 text-center">Your Hole Cards</Text>
+        <View className="flex-row justify-center gap-2">
           {holeCards.map((card, index) => (
             <View key={index}>
               {card === null ? (
@@ -167,7 +161,7 @@ export default function BoardSetup({ onChange }: BoardSetupProps) {
                 />
               ) : (
                 <Pressable
-                  className="w-20 h-28 bg-white border-2 border-gray-300 rounded-xl shadow-md justify-center items-center"
+                  className="bg-white px-3 py-2 rounded-lg border-2 border-gray-300 shadow-sm justify-center items-center"
                   onPress={() => returnCard(card, index, true)}
                 >
                   {renderCard(card)}

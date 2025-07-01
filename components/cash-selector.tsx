@@ -25,15 +25,13 @@ export default function CashSelector({ onChange }: CashSelectorProps) {
   }, [potAmount, callAmount, onChange]);
 
   return (
-    <View className="mt-4 p-4 bg-green-100 rounded-lg">
-      <Text className="text-base font-bold mb-4 text-black">Pot & Call Amounts</Text>
-
-      <View className="flex-row gap-4">
+    <View className="mb-4">
+      <View className="flex-row gap-3">
         {/* Pot Amount */}
         <View className="flex-1">
-          <Text className="text-sm font-bold mb-2 text-black">Chips in Pot</Text>
+          <Text className="text-xs font-semibold mb-1">Pot</Text>
           <TextInput
-            className="p-3 border-2 border-gray-300 rounded-lg bg-white"
+            className="p-2 border-2 border-gray-300 rounded-lg bg-white"
             value={potAmount}
             onChangeText={setPotAmount}
             placeholder="0"
@@ -43,9 +41,9 @@ export default function CashSelector({ onChange }: CashSelectorProps) {
 
         {/* Call Amount */}
         <View className="flex-1">
-          <Text className="text-sm font-bold mb-2 text-black">Chips to Call</Text>
+          <Text className="text-xs font-semibold mb-1">Call</Text>
           <TextInput
-            className={`p-3 border-2 rounded-lg bg-white ${!isValid && callAmount && potAmount
+            className={`p-2 border-2 rounded-lg bg-white ${!isValid && callAmount && potAmount
               ? 'border-red-500'
               : 'border-gray-300'
               }`}
@@ -59,9 +57,11 @@ export default function CashSelector({ onChange }: CashSelectorProps) {
 
       {/* Error Message */}
       {!isValid && callAmount && potAmount && (
-        <Text className="text-xs text-black mt-2">
-          Call amount cannot be greater than pot amount
-        </Text>
+        <View className="mt-2">
+          <Text className="text-xs text-red-700">
+            Call amount cannot be greater than pot amount
+          </Text>
+        </View>
       )}
     </View>
   );

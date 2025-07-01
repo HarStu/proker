@@ -32,14 +32,13 @@ export default function HandPicker({ onHandSelected }: HandPickerProps) {
   };
 
   return (
-    <View className="mt-4 p-4 bg-green-100 rounded-lg">
-      <Text className="text-base font-bold mb-4 text-black">What hand are you drawing to?</Text>
+    <View className="mb-4">
       <Pressable
-        className="p-4 border-2 border-gray-300 rounded-lg bg-gray-50"
+        className="p-3 border-2 border-gray-300 rounded-lg bg-gray-50"
         onPress={() => setIsHandPickerOpen(true)}
       >
         <Text className={selectedHand ? "text-black" : "text-gray-500"}>
-          {selectedHand || "Select a hand..."}
+          {selectedHand || "Select target hand..."}
         </Text>
       </Pressable>
 
@@ -51,15 +50,15 @@ export default function HandPicker({ onHandSelected }: HandPickerProps) {
         onRequestClose={() => setIsHandPickerOpen(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-green-100 rounded-t-xl p-4">
-            <Text className="text-base font-bold mb-4 text-center text-black">Select Hand</Text>
+          <View className="bg-white rounded-t-xl p-4">
+            <Text className="text-lg font-bold mb-4 text-center">Select Hand</Text>
             {hands.map((hand) => (
               <Pressable
                 key={hand}
                 className="p-4 border-b border-gray-200"
                 onPress={() => handleHandSelect(hand)}
               >
-                <Text className="text-base text-black">{hand}</Text>
+                <Text className="text-base">{hand}</Text>
               </Pressable>
             ))}
             <Pressable
