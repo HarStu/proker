@@ -40,17 +40,21 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 - Record each specific card that improves your hand
 - Track both primary and secondary outs separately:
   - Primary: Main draw outs (e.g., flush draw cards)
-  - Secondary: Additional improvement cards (e.g., overcards)
-- **Four of a Kind:** Only tracked as secondary outs, never primary
-- Example: A♠K♠ on J♠7♠2♥
-  - Primary (9 flush outs): 2♠,3♠,4♠,5♠,6♠,8♠,9♠,10♠,Q♠ 
-  - Secondary (3 overcard outs): A♥,A♣,K♥
-  - Total: 12 specific outs tracked
+  - Secondary: Additional improvement cards (e.g., overcards, trips, four of a kind)
+- **Secondary outs include:**
+  - Overcard outs: Cards that make a higher pair
+  - Trips outs: Remaining cards matching existing pair (when starting with pair)
+  - Four of a kind outs: When already holding trips
+- Example: Qh Jh on 5h 8h Js
+  - Primary (9 flush outs): 2h,3h,4h,6h,7h,9h,10h,Ah,Kh
+  - Secondary overcard (2 outs): Qc,Qd
+  - Secondary trips (2 outs): Jc,Jd
+  - Total: 13 specific outs tracked
 
 **Outs Range:**
 - Minimum: 2 outs
-- Maximum: 12 outs
-- Avoid impossible draws
+- Maximum: 15 outs (adjusted to accommodate all improvement types)
+- Scenarios exceeding 12 outs should be generated less frequently to maintain balance
 
 ### 4. Pot and Call Amounts
 **Pot Sizes:**
@@ -74,7 +78,7 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 **Equity:**
 - Use Rule of 4 and 2: `equity = outs × multiplier`
 - Multiplier: 4 for flop (2 cards to come), 2 for turn (1 card to come)
-- Range: 10%-50%
+- Range: 10%-60% (increased to accommodate higher out counts)
 - Basis for pot odds generation
 
 **Decisions:**
@@ -120,14 +124,14 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 ### Quality Validation Checklist:
 - [ ] Hole cards involved in draw
 - [ ] Initial hand no better than one pair
-- [ ] Outs count: 2-12
+- [ ] Outs count: 2-15 (prefer 2-12 for balance)
 - [ ] Pot odds: 8%-62% (close to equity)
 - [ ] Equity: 10%-50%
 - [ ] Equity within ±8% of pot odds
 - [ ] Clear call/fold decision
 - [ ] Realistic scenario
 - [ ] No calculator needed
-- [ ] Includes secondary outs (including four of a kind)
+- [ ] Includes all secondary outs (overcards, trips, four of a kind)
 - [ ] Four of a kind only as secondary draw
 - [ ] Balanced EV distribution (target 50/50)
 

@@ -1284,10 +1284,17 @@ function calculateDetailedOuts(holeCards: Card[], boardCards: Card[], deck: Deck
   const overcardOuts = getActualOvercardOuts(holeCards, boardCards, availableDeck);
   const quadOuts = getActualQuadOuts(holeCards, boardCards, availableDeck);
 
-  const secondaryCards: Card[] = [...overcardOuts, ...quadOuts];
+  // Add trips outs as secondary when not already counted as primary
+  let secondaryTripsOuts: Card[] = [];
+  if (primaryType !== "Three of a Kind") {
+    secondaryTripsOuts = getActualTripsOuts(holeCards, boardCards, availableDeck);
+  }
+
+  const secondaryCards: Card[] = [...overcardOuts, ...quadOuts, ...secondaryTripsOuts];
   const secondaryTypes: string[] = [];
   if (overcardOuts.length > 0) secondaryTypes.push("Overcards");
   if (quadOuts.length > 0) secondaryTypes.push("Four of a Kind");
+  if (secondaryTripsOuts.length > 0) secondaryTypes.push("Three of a Kind");
 
   // Remove any overlap between primary and secondary
   const primaryCardKeys = new Set(primaryCards.map(c => `${c.rank}-${c.suit}`));
@@ -1295,9 +1302,9 @@ function calculateDetailedOuts(holeCards: Card[], boardCards: Card[], deck: Deck
 
   const totalCards = [...primaryCards, ...uniqueSecondaryCards];
 
-  // Enforce specification limit of maximum 12 outs
-  const limitedTotalCards = totalCards.slice(0, 12);
-  const limitedSecondaryCards = uniqueSecondaryCards.slice(0, Math.max(0, 12 - primaryCards.length));
+  // Enforce specification limit of maximum 15 outs
+  const limitedTotalCards = totalCards.slice(0, 15);
+  const limitedSecondaryCards = uniqueSecondaryCards.slice(0, Math.max(0, 15 - primaryCards.length));
 
   return {
     outCards: {
@@ -1572,7 +1579,7 @@ function generateBalancedPotOdds(equity: number): { potAmount: number; callAmoun
 function isValidScenario(equity: number, potOdds: number, outs: number): boolean {
   // Check if equity is within ±8% of pot odds
   const difference = Math.abs(equity - potOdds);
-  return difference <= 8 && outs >= 2 && outs <= 12 && equity >= 10 && equity <= 50;
+  return difference <= 8 && outs >= 2 && outs <= 15 && equity >= 10 && equity <= 60;
 }
 
 function generateScenarioDescription(holeCards: Card[], boardCards: Card[], potAmount: number, callAmount: number, isFlop: boolean): string {
