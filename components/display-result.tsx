@@ -45,7 +45,7 @@ export default function DisplayResult({ result }: DisplayResultProps) {
         <View className="flex-1 items-center">
           <Text className="text-xs text-black">{isDrawAchieved ? "Call %" : "Pot Odds"}</Text>
           <Text className="text-lg font-bold text-black">
-            {canShowFullResults ? `${potOdds.toFixed(1)}%` : "---"}
+            {canShowFullResults ? `${potOdds.toFixed(1)}:1` : "---"}
           </Text>
         </View>
         {/* Equity */}
