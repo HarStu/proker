@@ -11,6 +11,18 @@ export type Card = {
 
 export type Deck = Card[]
 
+export type HandRanking =
+  | "High Card"
+  | "Pair"
+  | "Two Pair"
+  | "Three of a Kind"
+  | "Straight"
+  | "Flush"
+  | "Full House"
+  | "Four of a Kind"
+  | "Straight Flush"
+  | "Royal Flush"
+
 // return a shuffled Deck
 export function generateDeck(): Deck {
   const validSuits: Suit[] = ['h', 'd', 'c', 's']
@@ -36,19 +48,6 @@ export function generateDeck(): Deck {
 
   return shuffledDeck
 }
-
-// Hand ranking type
-export type HandRanking =
-  | "High Card"
-  | "Pair"
-  | "Two Pair"
-  | "Three of a Kind"
-  | "Straight"
-  | "Flush"
-  | "Full House"
-  | "Four of a Kind"
-  | "Straight Flush"
-  | "Royal Flush"
 
 // Calculate pot odds percentage
 export function calculatePotOdds(potAmount: number, callAmount: number): number {
