@@ -558,6 +558,17 @@ export interface CallPracticeScenario {
   potOdds: number;
   correctDecision: 'call' | 'fold';
   description: string;
+  outCards: {
+    primary: Card[];
+    secondary: Card[];
+    total: Card[];
+  };
+  outBreakdown: {
+    primaryOuts: number;
+    primaryType: string;
+    secondaryOuts: number;
+    secondaryTypes: string[];
+  };
 }
 
 export function generateCallPracticeScenario(): CallPracticeScenario {
@@ -591,7 +602,8 @@ export function generateCallPracticeScenario(): CallPracticeScenario {
     }
 
     // Step 5: Calculate outs (including secondary and four of a kind)
-    const outs = calculateAllOuts(holeCards, boardCards, deck);
+    const detailedOuts = calculateDetailedOuts(holeCards, boardCards, deck);
+    const outs = detailedOuts.outCards.total.length;
 
     if (outs < 2 || outs > 12) {
       continue;
@@ -624,7 +636,9 @@ export function generateCallPracticeScenario(): CallPracticeScenario {
       equity,
       potOdds,
       correctDecision,
-      description
+      description,
+      outCards: detailedOuts.outCards,
+      outBreakdown: detailedOuts.outBreakdown
     };
   }
 
@@ -670,119 +684,511 @@ function generateValidScenario(boardCardCount: number, drawType: string): { hole
 }
 
 function generateFlushDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
-  const suit = ['h', 'd', 'c', 's'][Math.floor(Math.random() * 4)] as Suit;
-  const ranks = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  const suits = ['h', 'd', 'c', 's'] as Suit[];
+  const flushSuit = suits[Math.floor(Math.random() * 4)];
 
-  const holeCards: Card[] = [];
-  const boardCards: Card[] = [];
+  let attempts = 0;
+  while (attempts < 50) {
+    attempts++;
 
-  // 2 suited hole cards
-  for (let i = 0; i < 2; i++) {
-    const rank = ranks[Math.floor(Math.random() * ranks.length)] as Rank;
-    holeCards.push({ rank, suit });
+    const usedCards = new Set<string>();
+    const holeCards: Card[] = [];
+    const boardCards: Card[] = [];
+
+    try {
+      // Get available cards of the flush suit from deck
+      const availableFlushCards = deck.filter(card => card.suit === flushSuit);
+      const availableOffSuitCards = deck.filter(card => card.suit !== flushSuit);
+
+      if (availableFlushCards.length < 4 || availableOffSuitCards.length < (boardCardCount - 2)) {
+        continue; // Not enough cards available
+      }
+
+      // Shuffle and take 4 cards for the flush draw (2 hole + 2 board)
+      const shuffledFlushCards = [...availableFlushCards].sort(() => Math.random() - 0.5);
+      const flushDrawCards = shuffledFlushCards.slice(0, 4);
+
+      // Assign 2 to hole cards, 2 to board
+      holeCards.push(flushDrawCards[0], flushDrawCards[1]);
+      boardCards.push(flushDrawCards[2], flushDrawCards[3]);
+
+      // Track used cards
+      flushDrawCards.forEach(card => {
+        usedCards.add(`${card.rank}-${card.suit}`);
+      });
+
+      // Fill remaining board slots with off-suit cards
+      const availableOffSuit = availableOffSuitCards.filter(card =>
+        !usedCards.has(`${card.rank}-${card.suit}`)
+      );
+
+      const shuffledOffSuit = [...availableOffSuit].sort(() => Math.random() - 0.5);
+      const neededOffSuit = boardCardCount - 2;
+
+      for (let i = 0; i < neededOffSuit && i < shuffledOffSuit.length; i++) {
+        const card = shuffledOffSuit[i];
+        boardCards.push(card);
+        usedCards.add(`${card.rank}-${card.suit}`);
+      }
+
+      // Validate we have the right number of cards and no duplicates
+      if (holeCards.length === 2 && boardCards.length === boardCardCount && usedCards.size === 2 + boardCardCount) {
+        return { holeCards, boardCards };
+      }
+    } catch (error) {
+      // Continue to next attempt
+    }
   }
 
-  // 2 suited cards on board, rest off-suit
-  for (let i = 0; i < boardCardCount; i++) {
-    if (i < 2) {
-      const rank = ranks[Math.floor(Math.random() * ranks.length)] as Rank;
-      boardCards.push({ rank, suit });
-    } else {
-      const offSuit = ['h', 'd', 'c', 's'].filter(s => s !== suit)[Math.floor(Math.random() * 3)] as Suit;
-      const rank = ranks[Math.floor(Math.random() * ranks.length)] as Rank;
-      boardCards.push({ rank, suit: offSuit });
-    }
+  // Fallback: return a safe flush draw
+  return generateFallbackFlushDraw(boardCardCount);
+}
+
+function generateFallbackFlushDraw(boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const holeCards: Card[] = [
+    { rank: 14, suit: 'h' }, // A♥
+    { rank: 13, suit: 'h' }  // K♥
+  ];
+
+  const boardCards: Card[] = [
+    { rank: 11, suit: 'h' }, // J♥
+    { rank: 7, suit: 'h' },  // 7♥
+    { rank: 2, suit: 'd' }   // 2♦
+  ];
+
+  if (boardCardCount === 4) {
+    boardCards.push({ rank: 3, suit: 'c' }); // 3♣
   }
 
   return { holeCards, boardCards };
 }
 
 function generateStraightDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
-  // Generate open-ended straight draw
-  const startRank = 5 + Math.floor(Math.random() * 6); // 5-10 to avoid wheel complications
-  const suits = ['h', 'd', 'c', 's'];
+  const suits = ['h', 'd', 'c', 's'] as Suit[];
 
-  const holeCards: Card[] = [];
-  const boardCards: Card[] = [];
+  // Create different types of straight draws
+  const drawTypes = ['open-ended', 'gutshot', 'double-gutshot'];
+  const drawType = drawTypes[Math.floor(Math.random() * drawTypes.length)];
 
-  // Hole cards: consecutive ranks
-  holeCards.push({ rank: startRank as Rank, suit: suits[Math.floor(Math.random() * 4)] as Suit });
-  holeCards.push({ rank: (startRank + 1) as Rank, suit: suits[Math.floor(Math.random() * 4)] as Suit });
+  let attempts = 0;
+  while (attempts < 50) {
+    attempts++;
 
-  // Board cards: fill in some of the straight
-  for (let i = 0; i < boardCardCount; i++) {
-    const rank = (startRank + 2 + i) as Rank;
-    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
-    boardCards.push({ rank, suit });
+    const usedCards = new Set<string>();
+    const holeCards: Card[] = [];
+    const boardCards: Card[] = [];
+
+    try {
+      if (drawType === 'open-ended') {
+        // Open-ended straight draw: need 4 cards in sequence, missing one or both ends
+        const startRank = 6 + Math.floor(Math.random() * 5); // 6-10 to avoid wheel/broadway complications
+
+        if (boardCardCount === 3) {
+          // Flop: hole cards can be part of 4-card sequence
+          // Example: hole 7-8, board 9-10-X = open-ended (6 or J makes straight)
+          const holeRank1 = startRank;
+          const holeRank2 = startRank + 1;
+          const boardRank1 = startRank + 2;
+          const boardRank2 = startRank + 3;
+
+          // Add hole cards
+          for (let i = 0; i < 2; i++) {
+            const rank = i === 0 ? holeRank1 : holeRank2;
+            const suit = suits[Math.floor(Math.random() * 4)];
+            const cardKey = `${rank}-${suit}`;
+            if (usedCards.has(cardKey)) continue;
+            holeCards.push({ rank: rank as Rank, suit });
+            usedCards.add(cardKey);
+          }
+
+          // Add first two board cards (sequence)
+          for (let i = 0; i < 2; i++) {
+            const rank = i === 0 ? boardRank1 : boardRank2;
+            const suit = suits[Math.floor(Math.random() * 4)];
+            const cardKey = `${rank}-${suit}`;
+            if (usedCards.has(cardKey)) continue;
+            boardCards.push({ rank: rank as Rank, suit });
+            usedCards.add(cardKey);
+          }
+
+          // Add one random card that doesn't complete the straight
+          let randomCard;
+          let randomAttempts = 0;
+          do {
+            randomAttempts++;
+            const rank = (2 + Math.floor(Math.random() * 11)) as Rank; // 2-12, avoid A
+            const suit = suits[Math.floor(Math.random() * 4)];
+            const cardKey = `${rank}-${suit}`;
+            randomCard = { rank, suit, cardKey };
+          } while ((usedCards.has(randomCard.cardKey) ||
+            randomCard.rank === startRank - 1 ||
+            randomCard.rank === startRank + 4) && randomAttempts < 20);
+
+          if (randomAttempts < 20) {
+            boardCards.push({ rank: randomCard.rank, suit: randomCard.suit });
+            usedCards.add(randomCard.cardKey);
+          }
+        } else {
+          // Turn: similar but with 4 board cards
+          const holeRank1 = startRank;
+          const holeRank2 = startRank + 1;
+          const boardRank1 = startRank + 2;
+          const boardRank2 = startRank + 3;
+
+          // Add hole cards
+          for (let i = 0; i < 2; i++) {
+            const rank = i === 0 ? holeRank1 : holeRank2;
+            const suit = suits[Math.floor(Math.random() * 4)];
+            const cardKey = `${rank}-${suit}`;
+            if (usedCards.has(cardKey)) continue;
+            holeCards.push({ rank: rank as Rank, suit });
+            usedCards.add(cardKey);
+          }
+
+          // Add sequence cards to board
+          for (let i = 0; i < 2; i++) {
+            const rank = i === 0 ? boardRank1 : boardRank2;
+            const suit = suits[Math.floor(Math.random() * 4)];
+            const cardKey = `${rank}-${suit}`;
+            if (usedCards.has(cardKey)) continue;
+            boardCards.push({ rank: rank as Rank, suit });
+            usedCards.add(cardKey);
+          }
+
+          // Add two random cards
+          for (let i = 0; i < 2; i++) {
+            let randomCard;
+            let randomAttempts = 0;
+            do {
+              randomAttempts++;
+              const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
+              const suit = suits[Math.floor(Math.random() * 4)];
+              const cardKey = `${rank}-${suit}`;
+              randomCard = { rank, suit, cardKey };
+            } while ((usedCards.has(randomCard.cardKey) ||
+              randomCard.rank === startRank - 1 ||
+              randomCard.rank === startRank + 4) && randomAttempts < 20);
+
+            if (randomAttempts < 20) {
+              boardCards.push({ rank: randomCard.rank, suit: randomCard.suit });
+              usedCards.add(randomCard.cardKey);
+            }
+          }
+        }
+      } else if (drawType === 'gutshot') {
+        // Gutshot: 4 cards with one gap in the middle
+        const startRank = 6 + Math.floor(Math.random() * 5); // 6-10
+
+        // Example: 7-8-10-J (missing 9 for straight)
+        const ranks = [startRank, startRank + 1, startRank + 3, startRank + 4];
+
+        // Randomly assign 2 ranks to hole cards, rest to board
+        const shuffledRanks = [...ranks].sort(() => Math.random() - 0.5);
+        const holeRanks = shuffledRanks.slice(0, 2);
+        const boardRanks = shuffledRanks.slice(2);
+
+        // Add hole cards
+        for (const rank of holeRanks) {
+          const suit = suits[Math.floor(Math.random() * 4)];
+          const cardKey = `${rank}-${suit}`;
+          if (usedCards.has(cardKey)) continue;
+          holeCards.push({ rank: rank as Rank, suit });
+          usedCards.add(cardKey);
+        }
+
+        // Add board cards (sequence + random)
+        for (const rank of boardRanks) {
+          const suit = suits[Math.floor(Math.random() * 4)];
+          const cardKey = `${rank}-${suit}`;
+          if (usedCards.has(cardKey)) continue;
+          boardCards.push({ rank: rank as Rank, suit });
+          usedCards.add(cardKey);
+        }
+
+        // Fill remaining board slots with random cards
+        while (boardCards.length < boardCardCount) {
+          let randomAttempts = 0;
+          let randomCard;
+          do {
+            randomAttempts++;
+            const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
+            const suit = suits[Math.floor(Math.random() * 4)];
+            const cardKey = `${rank}-${suit}`;
+            randomCard = { rank, suit, cardKey };
+          } while ((usedCards.has(randomCard.cardKey) ||
+            randomCard.rank === startRank + 2) && randomAttempts < 20); // Don't add the missing card
+
+          if (randomAttempts < 20) {
+            boardCards.push({ rank: randomCard.rank, suit: randomCard.suit });
+            usedCards.add(randomCard.cardKey);
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Validate we have the right number of cards and no duplicates
+      if (holeCards.length === 2 && boardCards.length === boardCardCount && usedCards.size === 2 + boardCardCount) {
+        return { holeCards, boardCards };
+      }
+    } catch (error) {
+      // Continue to next attempt
+    }
+  }
+
+  // Fallback: simple open-ended draw
+  return generateFallbackStraightDraw(boardCardCount);
+}
+
+function generateFallbackStraightDraw(boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const suits = ['h', 'd', 'c', 's'] as Suit[];
+  const holeCards: Card[] = [
+    { rank: 8, suit: 'h' },
+    { rank: 9, suit: 'd' }
+  ];
+
+  const boardCards: Card[] = [
+    { rank: 10, suit: 'c' },
+    { rank: 11, suit: 's' },
+    { rank: 2, suit: 'h' }
+  ];
+
+  if (boardCardCount === 4) {
+    boardCards.push({ rank: 3, suit: 'd' });
   }
 
   return { holeCards, boardCards };
 }
 
 function generateFullHouseDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
-  const suits = ['h', 'd', 'c', 's'];
-  const rank1 = (2 + Math.floor(Math.random() * 11)) as Rank; // 2-12
-  const rank2 = (2 + Math.floor(Math.random() * 11)) as Rank; // 2-12
+  let attempts = 0;
+  while (attempts < 50) {
+    attempts++;
 
-  const holeCards: Card[] = [];
-  const boardCards: Card[] = [];
+    const usedCards = new Set<string>();
+    const holeCards: Card[] = [];
+    const boardCards: Card[] = [];
 
-  // Pocket pair
-  holeCards.push({ rank: rank1, suit: suits[0] as Suit });
-  holeCards.push({ rank: rank1, suit: suits[1] as Suit });
+    try {
+      // Pick a rank for the pocket pair (that will become trips)
+      const availableRanks = Array.from(new Set(deck.map(c => c.rank)));
+      const pocketRank = availableRanks[Math.floor(Math.random() * availableRanks.length)];
 
-  // Board has one matching rank (for trips) and other cards
-  boardCards.push({ rank: rank1, suit: suits[2] as Suit }); // Makes trips
+      // Get available cards of this rank
+      const availablePocketCards = deck.filter(card => card.rank === pocketRank);
+      if (availablePocketCards.length < 3) continue; // Need at least 3 for pocket pair + board card
 
-  for (let i = 1; i < boardCardCount; i++) {
-    const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
-    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
-    boardCards.push({ rank, suit });
+      // Take 3 cards of this rank
+      const shuffledPocketCards = [...availablePocketCards].sort(() => Math.random() - 0.5);
+
+      // Assign 2 to hole cards (pocket pair), 1 to board (makes trips)
+      holeCards.push(shuffledPocketCards[0], shuffledPocketCards[1]);
+      boardCards.push(shuffledPocketCards[2]);
+
+      // Track used cards
+      shuffledPocketCards.slice(0, 3).forEach(card => {
+        usedCards.add(`${card.rank}-${card.suit}`);
+      });
+
+      // Fill remaining board slots with different ranks
+      const remainingSlots = boardCardCount - 1;
+      const availableOtherCards = deck.filter(card =>
+        card.rank !== pocketRank && !usedCards.has(`${card.rank}-${card.suit}`)
+      );
+
+      const shuffledOtherCards = [...availableOtherCards].sort(() => Math.random() - 0.5);
+
+      for (let i = 0; i < remainingSlots && i < shuffledOtherCards.length; i++) {
+        const card = shuffledOtherCards[i];
+        boardCards.push(card);
+        usedCards.add(`${card.rank}-${card.suit}`);
+      }
+
+      // Validate we have the right number of cards and no duplicates
+      if (holeCards.length === 2 && boardCards.length === boardCardCount && usedCards.size === 2 + boardCardCount) {
+        return { holeCards, boardCards };
+      }
+    } catch (error) {
+      // Continue to next attempt
+    }
+  }
+
+  // Fallback
+  return generateFallbackFullHouseDraw(boardCardCount);
+}
+
+function generateFallbackFullHouseDraw(boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const holeCards: Card[] = [
+    { rank: 8, suit: 'h' }, // 8♥
+    { rank: 8, suit: 'd' }  // 8♦
+  ];
+
+  const boardCards: Card[] = [
+    { rank: 8, suit: 'c' }, // 8♣ (makes trips)
+    { rank: 5, suit: 's' }, // 5♠
+    { rank: 2, suit: 'h' }  // 2♥
+  ];
+
+  if (boardCardCount === 4) {
+    boardCards.push({ rank: 10, suit: 'd' }); // 10♦
   }
 
   return { holeCards, boardCards };
 }
 
 function generateTwoPairDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
-  const suits = ['h', 'd', 'c', 's'];
-  const rank1 = (2 + Math.floor(Math.random() * 11)) as Rank;
-  const rank2 = (2 + Math.floor(Math.random() * 11)) as Rank;
+  let attempts = 0;
+  while (attempts < 50) {
+    attempts++;
 
-  const holeCards: Card[] = [];
-  const boardCards: Card[] = [];
+    const usedCards = new Set<string>();
+    const holeCards: Card[] = [];
+    const boardCards: Card[] = [];
 
-  // One pair in hole cards
-  holeCards.push({ rank: rank1, suit: suits[0] as Suit });
-  holeCards.push({ rank: rank1, suit: suits[1] as Suit });
+    try {
+      // Get available ranks
+      const availableRanks = Array.from(new Set(deck.map(c => c.rank)));
+      if (availableRanks.length < 2) continue;
 
-  // Board has potential second pair
-  boardCards.push({ rank: rank2, suit: suits[0] as Suit });
+      // Pick two different ranks
+      const shuffledRanks = [...availableRanks].sort(() => Math.random() - 0.5);
+      const pairRank = shuffledRanks[0];
+      const kickerRank = shuffledRanks[1];
 
-  for (let i = 1; i < boardCardCount; i++) {
-    const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
-    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
-    boardCards.push({ rank, suit });
+      // Get pocket pair cards
+      const availablePairCards = deck.filter(card => card.rank === pairRank);
+      if (availablePairCards.length < 2) continue;
+
+      const shuffledPairCards = [...availablePairCards].sort(() => Math.random() - 0.5);
+      holeCards.push(shuffledPairCards[0], shuffledPairCards[1]);
+
+      // Track used cards
+      shuffledPairCards.slice(0, 2).forEach(card => {
+        usedCards.add(`${card.rank}-${card.suit}`);
+      });
+
+      // Add one card of kicker rank to board (potential second pair)
+      const availableKickerCards = deck.filter(card =>
+        card.rank === kickerRank && !usedCards.has(`${card.rank}-${card.suit}`)
+      );
+      if (availableKickerCards.length === 0) continue;
+
+      const kickerCard = availableKickerCards[Math.floor(Math.random() * availableKickerCards.length)];
+      boardCards.push(kickerCard);
+      usedCards.add(`${kickerCard.rank}-${kickerCard.suit}`);
+
+      // Fill remaining board slots with other cards
+      const remainingSlots = boardCardCount - 1;
+      const availableOtherCards = deck.filter(card =>
+        card.rank !== pairRank && card.rank !== kickerRank && !usedCards.has(`${card.rank}-${card.suit}`)
+      );
+
+      const shuffledOtherCards = [...availableOtherCards].sort(() => Math.random() - 0.5);
+
+      for (let i = 0; i < remainingSlots && i < shuffledOtherCards.length; i++) {
+        const card = shuffledOtherCards[i];
+        boardCards.push(card);
+        usedCards.add(`${card.rank}-${card.suit}`);
+      }
+
+      // Validate we have the right number of cards and no duplicates
+      if (holeCards.length === 2 && boardCards.length === boardCardCount && usedCards.size === 2 + boardCardCount) {
+        return { holeCards, boardCards };
+      }
+    } catch (error) {
+      // Continue to next attempt
+    }
+  }
+
+  // Fallback
+  return generateFallbackTwoPairDraw(boardCardCount);
+}
+
+function generateFallbackTwoPairDraw(boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const holeCards: Card[] = [
+    { rank: 9, suit: 'h' }, // 9♥
+    { rank: 9, suit: 'd' }  // 9♦
+  ];
+
+  const boardCards: Card[] = [
+    { rank: 6, suit: 'c' }, // 6♣ (potential second pair)
+    { rank: 3, suit: 's' }, // 3♠
+    { rank: 11, suit: 'h' } // J♥
+  ];
+
+  if (boardCardCount === 4) {
+    boardCards.push({ rank: 2, suit: 'd' }); // 2♦
   }
 
   return { holeCards, boardCards };
 }
 
 function generateThreeOfAKindDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
-  const suits = ['h', 'd', 'c', 's'];
-  const rank1 = (2 + Math.floor(Math.random() * 11)) as Rank;
+  let attempts = 0;
+  while (attempts < 50) {
+    attempts++;
 
-  const holeCards: Card[] = [];
-  const boardCards: Card[] = [];
+    const usedCards = new Set<string>();
+    const holeCards: Card[] = [];
+    const boardCards: Card[] = [];
 
-  // Pocket pair
-  holeCards.push({ rank: rank1, suit: suits[0] as Suit });
-  holeCards.push({ rank: rank1, suit: suits[1] as Suit });
+    try {
+      // Pick a rank for the pocket pair
+      const availableRanks = Array.from(new Set(deck.map(c => c.rank)));
+      const pairRank = availableRanks[Math.floor(Math.random() * availableRanks.length)];
 
-  // Board with potential to make trips
-  for (let i = 0; i < boardCardCount; i++) {
-    const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
-    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
-    boardCards.push({ rank, suit });
+      // Get pocket pair cards
+      const availablePairCards = deck.filter(card => card.rank === pairRank);
+      if (availablePairCards.length < 2) continue;
+
+      const shuffledPairCards = [...availablePairCards].sort(() => Math.random() - 0.5);
+      holeCards.push(shuffledPairCards[0], shuffledPairCards[1]);
+
+      // Track used cards
+      shuffledPairCards.slice(0, 2).forEach(card => {
+        usedCards.add(`${card.rank}-${card.suit}`);
+      });
+
+      // Fill board with different ranks (no trips on board initially)
+      const availableOtherCards = deck.filter(card =>
+        card.rank !== pairRank && !usedCards.has(`${card.rank}-${card.suit}`)
+      );
+
+      const shuffledOtherCards = [...availableOtherCards].sort(() => Math.random() - 0.5);
+
+      for (let i = 0; i < boardCardCount && i < shuffledOtherCards.length; i++) {
+        const card = shuffledOtherCards[i];
+        boardCards.push(card);
+        usedCards.add(`${card.rank}-${card.suit}`);
+      }
+
+      // Validate we have the right number of cards and no duplicates
+      if (holeCards.length === 2 && boardCards.length === boardCardCount && usedCards.size === 2 + boardCardCount) {
+        return { holeCards, boardCards };
+      }
+    } catch (error) {
+      // Continue to next attempt
+    }
+  }
+
+  // Fallback
+  return generateFallbackThreeOfAKindDraw(boardCardCount);
+}
+
+function generateFallbackThreeOfAKindDraw(boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const holeCards: Card[] = [
+    { rank: 7, suit: 'h' }, // 7♥
+    { rank: 7, suit: 'd' }  // 7♦
+  ];
+
+  const boardCards: Card[] = [
+    { rank: 12, suit: 'c' }, // Q♣
+    { rank: 4, suit: 's' },  // 4♠
+    { rank: 10, suit: 'h' }  // 10♥
+  ];
+
+  if (boardCardCount === 4) {
+    boardCards.push({ rank: 3, suit: 'd' }); // 3♦
   }
 
   return { holeCards, boardCards };
@@ -791,39 +1197,305 @@ function generateThreeOfAKindDraw(deck: Deck, boardCardCount: number): { holeCar
 function isValidStartingHand(holeCards: Card[], boardCards: Card[]): boolean {
   const allCards = [...holeCards, ...boardCards];
   const rankCounts = new Map<Rank, number>();
+  const suitCounts = new Map<Suit, number>();
+
+  allCards.forEach(card => {
+    rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+    suitCounts.set(card.suit, (suitCounts.get(card.suit) || 0) + 1);
+  });
+
+  // Check that we don't start with better than a pair
+  const maxCount = Math.max(...rankCounts.values());
+  if (maxCount > 2) return false; // No trips or better
+
+  // Check that we don't start with a completed straight
+  if (hasCompletedStraight(allCards)) return false;
+
+  // Check that we don't start with a completed flush
+  const maxSuitCount = Math.max(...suitCounts.values());
+  if (maxSuitCount >= 5) return false;
+
+  return true;
+}
+
+function hasCompletedStraight(cards: Card[]): boolean {
+  const ranks = Array.from(new Set(cards.map(c => c.rank))).sort((a, b) => a - b);
+
+  // Check for regular straights
+  for (let i = 0; i <= ranks.length - 5; i++) {
+    let consecutive = 1;
+    for (let j = i + 1; j < ranks.length; j++) {
+      if (ranks[j] === ranks[j - 1] + 1) {
+        consecutive++;
+        if (consecutive >= 5) return true;
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Check for wheel straight (A-2-3-4-5)
+  if (ranks.includes(14) && ranks.includes(2) && ranks.includes(3) && ranks.includes(4) && ranks.includes(5)) {
+    return true;
+  }
+
+  return false;
+}
+
+// Removed calculateAllOuts - now using calculateDetailedOuts for consistency
+
+function calculateDetailedOuts(holeCards: Card[], boardCards: Card[], deck: Deck): {
+  outCards: { primary: Card[]; secondary: Card[]; total: Card[] };
+  outBreakdown: { primaryOuts: number; primaryType: string; secondaryOuts: number; secondaryTypes: string[] };
+} {
+  const usedCards = new Set([...holeCards, ...boardCards].map(c => `${c.rank}-${c.suit}`));
+  const availableDeck = deck.filter(card => !usedCards.has(`${card.rank}-${card.suit}`));
+
+  // Calculate primary outs
+  const flushOuts = getActualFlushOuts(holeCards, boardCards, availableDeck);
+  const straightOuts = getActualStraightOuts(holeCards, boardCards, availableDeck);
+  const fullHouseOuts = getActualFullHouseOuts(holeCards, boardCards, availableDeck);
+  const twoPairOuts = getActualTwoPairOuts(holeCards, boardCards, availableDeck);
+  const tripsOuts = getActualTripsOuts(holeCards, boardCards, availableDeck);
+
+  // Find the best primary draw - prioritize by poker hand strength, then by count
+  let primaryCards: Card[] = [];
+  let primaryType = "";
+
+  // Priority order: Straight Flush > Flush > Straight > Full House > Trips > Two Pair
+  if (flushOuts.length >= 4) {
+    primaryCards = flushOuts;
+    primaryType = "Flush";
+  } else if (straightOuts.length >= 4) {
+    primaryCards = straightOuts;
+    primaryType = "Straight";
+  } else if (fullHouseOuts.length > 0) {
+    primaryCards = fullHouseOuts;
+    primaryType = "Full House";
+  } else if (tripsOuts.length > 0) {
+    primaryCards = tripsOuts;
+    primaryType = "Three of a Kind";
+  } else if (twoPairOuts.length > 0) {
+    primaryCards = twoPairOuts;
+    primaryType = "Two Pair";
+  }
+
+  // Calculate secondary outs
+  const overcardOuts = getActualOvercardOuts(holeCards, boardCards, availableDeck);
+  const quadOuts = getActualQuadOuts(holeCards, boardCards, availableDeck);
+
+  const secondaryCards: Card[] = [...overcardOuts, ...quadOuts];
+  const secondaryTypes: string[] = [];
+  if (overcardOuts.length > 0) secondaryTypes.push("Overcards");
+  if (quadOuts.length > 0) secondaryTypes.push("Four of a Kind");
+
+  // Remove any overlap between primary and secondary
+  const primaryCardKeys = new Set(primaryCards.map(c => `${c.rank}-${c.suit}`));
+  const uniqueSecondaryCards = secondaryCards.filter(c => !primaryCardKeys.has(`${c.rank}-${c.suit}`));
+
+  const totalCards = [...primaryCards, ...uniqueSecondaryCards];
+
+  // Enforce specification limit of maximum 12 outs
+  const limitedTotalCards = totalCards.slice(0, 12);
+  const limitedSecondaryCards = uniqueSecondaryCards.slice(0, Math.max(0, 12 - primaryCards.length));
+
+  return {
+    outCards: {
+      primary: primaryCards,
+      secondary: limitedSecondaryCards,
+      total: limitedTotalCards
+    },
+    outBreakdown: {
+      primaryOuts: primaryCards.length,
+      primaryType,
+      secondaryOuts: limitedSecondaryCards.length,
+      secondaryTypes
+    }
+  };
+}
+
+function getActualFlushOuts(holeCards: Card[], boardCards: Card[], availableDeck: Card[]): Card[] {
+  const allCards = [...holeCards, ...boardCards];
+  const suitCounts = new Map<Suit, number>();
+  const holeCardSuits = holeCards.map(c => c.suit);
+
+  allCards.forEach(card => {
+    suitCounts.set(card.suit, (suitCounts.get(card.suit) || 0) + 1);
+  });
+
+  // Find flush draw suit (4 cards of same suit, involving hole cards)
+  for (const suit of holeCardSuits) {
+    if ((suitCounts.get(suit) || 0) === 4) {
+      return availableDeck.filter(card => card.suit === suit);
+    }
+  }
+
+  return [];
+}
+
+function getActualStraightOuts(holeCards: Card[], boardCards: Card[], availableDeck: Card[]): Card[] {
+  const allCards = [...holeCards, ...boardCards];
+  const ranks = Array.from(new Set(allCards.map(c => c.rank))).sort((a, b) => a - b);
+  const straightOutsSet = new Set<string>(); // Use Set to avoid duplicates
+
+  // Check for open-ended and gutshot opportunities
+  for (let start = 2; start <= 10; start++) {
+    const straightRanks = [start, start + 1, start + 2, start + 3, start + 4] as Rank[];
+    const presentRanks = straightRanks.filter(rank => ranks.includes(rank));
+
+    if (presentRanks.length >= 4) {
+      // Find missing ranks
+      const missingRanks = straightRanks.filter(rank => !ranks.includes(rank));
+      for (const missingRank of missingRanks) {
+        const outsForRank = availableDeck.filter(card => card.rank === missingRank);
+        outsForRank.forEach(card => {
+          straightOutsSet.add(`${card.rank}-${card.suit}`);
+        });
+      }
+    }
+  }
+
+  // Check for wheel (A-2-3-4-5)
+  const wheelRanks = [14, 2, 3, 4, 5] as Rank[]; // A-2-3-4-5
+  const presentWheelRanks = wheelRanks.filter(rank => ranks.includes(rank));
+  if (presentWheelRanks.length >= 4) {
+    const missingWheelRanks = wheelRanks.filter(rank => !ranks.includes(rank));
+    for (const missingRank of missingWheelRanks) {
+      const outsForRank = availableDeck.filter(card => card.rank === missingRank);
+      outsForRank.forEach(card => {
+        straightOutsSet.add(`${card.rank}-${card.suit}`);
+      });
+    }
+  }
+
+  // Convert back to Card array
+  const straightOuts: Card[] = [];
+  for (const cardKey of straightOutsSet) {
+    const [rankStr, suit] = cardKey.split('-');
+    const rank = parseInt(rankStr) as Rank;
+    straightOuts.push({ rank, suit: suit as Suit });
+  }
+
+  return straightOuts;
+}
+
+function getActualFullHouseOuts(holeCards: Card[], boardCards: Card[], availableDeck: Card[]): Card[] {
+  const allCards = [...holeCards, ...boardCards];
+  const rankCounts = new Map<Rank, number>();
 
   allCards.forEach(card => {
     rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
   });
 
-  // Check that we don't start with better than a pair
-  const maxCount = Math.max(...rankCounts.values());
-  return maxCount <= 2; // Pair or less
+  const fullHouseOuts: Card[] = [];
+
+  // Check for trips that can become full house
+  for (const [rank, count] of rankCounts) {
+    if (count === 3) {
+      // Need a pair to complete full house
+      for (const [otherRank, otherCount] of rankCounts) {
+        if (otherRank !== rank && otherCount === 1) {
+          const outsForRank = availableDeck.filter(card => card.rank === otherRank);
+          fullHouseOuts.push(...outsForRank);
+        }
+      }
+    } else if (count === 2) {
+      // Pair can become trips for full house
+      const outsForRank = availableDeck.filter(card => card.rank === rank);
+      fullHouseOuts.push(...outsForRank);
+    }
+  }
+
+  return fullHouseOuts;
 }
 
-function calculateAllOuts(holeCards: Card[], boardCards: Card[], deck: Deck): number {
-  let totalOuts = 0;
+function getActualTwoPairOuts(holeCards: Card[], boardCards: Card[], availableDeck: Card[]): Card[] {
+  const allCards = [...holeCards, ...boardCards];
+  const rankCounts = new Map<Rank, number>();
+  const holeCardRanks = holeCards.map(c => c.rank);
 
-  // Primary outs (flush, straight, etc.)
-  const primaryOuts = Math.max(
-    countOuts(holeCards, boardCards, "Flush", deck),
-    countOuts(holeCards, boardCards, "Straight", deck),
-    countOuts(holeCards, boardCards, "Full House", deck),
-    countOuts(holeCards, boardCards, "Two Pair", deck),
-    countOuts(holeCards, boardCards, "Three of a Kind", deck)
-  );
+  allCards.forEach(card => {
+    rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+  });
 
-  totalOuts += primaryOuts;
+  const twoPairOuts: Card[] = [];
 
-  // Secondary outs (overcards)
-  const secondaryOuts = calculateOvercardOuts(holeCards, boardCards, deck);
-  totalOuts += secondaryOuts;
+  // If we have one pair, look for cards that make a second pair
+  const pairRanks = Array.from(rankCounts.entries())
+    .filter(([rank, count]) => count === 2)
+    .map(([rank, count]) => rank);
 
-  // Four of a kind outs (secondary only)
-  const quadOuts = calculateQuadOuts(holeCards, boardCards, deck);
-  totalOuts += quadOuts;
+  if (pairRanks.length === 1) {
+    // Look for overcards that can pair
+    for (const holeCardRank of holeCardRanks) {
+      if (!rankCounts.has(holeCardRank) || rankCounts.get(holeCardRank) === 1) {
+        const outsForRank = availableDeck.filter(card => card.rank === holeCardRank);
+        twoPairOuts.push(...outsForRank);
+      }
+    }
+  }
 
-  return Math.min(12, totalOuts);
+  return twoPairOuts;
+}
+
+function getActualTripsOuts(holeCards: Card[], boardCards: Card[], availableDeck: Card[]): Card[] {
+  const allCards = [...holeCards, ...boardCards];
+  const rankCounts = new Map<Rank, number>();
+  const holeCardRanks = holeCards.map(c => c.rank);
+
+  allCards.forEach(card => {
+    rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+  });
+
+  const tripsOuts: Card[] = [];
+
+  // Check for pairs that can become trips
+  for (const holeCardRank of holeCardRanks) {
+    if ((rankCounts.get(holeCardRank) || 0) === 2) {
+      const outsForRank = availableDeck.filter(card => card.rank === holeCardRank);
+      tripsOuts.push(...outsForRank);
+    }
+  }
+
+  return tripsOuts;
+}
+
+function getActualOvercardOuts(holeCards: Card[], boardCards: Card[], availableDeck: Card[]): Card[] {
+  if (boardCards.length === 0) return [];
+
+  const boardRanks = boardCards.map(c => c.rank);
+  const maxBoardRank = Math.max(...boardRanks);
+  const overcardOuts: Card[] = [];
+
+  for (const holeCard of holeCards) {
+    if (holeCard.rank > maxBoardRank) {
+      const outsForRank = availableDeck.filter(card => card.rank === holeCard.rank);
+      overcardOuts.push(...outsForRank);
+    }
+  }
+
+  return overcardOuts;
+}
+
+function getActualQuadOuts(holeCards: Card[], boardCards: Card[], availableDeck: Card[]): Card[] {
+  const allCards = [...holeCards, ...boardCards];
+  const rankCounts = new Map<Rank, number>();
+
+  allCards.forEach(card => {
+    rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+  });
+
+  const quadOuts: Card[] = [];
+
+  // Check for trips that can become quads
+  for (const [rank, count] of rankCounts) {
+    if (count === 3) {
+      const outsForRank = availableDeck.filter(card => card.rank === rank);
+      quadOuts.push(...outsForRank);
+    }
+  }
+
+  return quadOuts;
 }
 
 function calculateOvercardOuts(holeCards: Card[], boardCards: Card[], deck: Deck): number {
@@ -930,6 +1602,13 @@ function createFallbackScenario(): CallPracticeScenario {
     { rank: 2, suit: 'd' }   // 2 of diamonds
   ];
 
+  // Create the flush outs manually for fallback
+  const flushOuts: Card[] = [
+    { rank: 2, suit: 'h' }, { rank: 3, suit: 'h' }, { rank: 4, suit: 'h' },
+    { rank: 5, suit: 'h' }, { rank: 6, suit: 'h' }, { rank: 8, suit: 'h' },
+    { rank: 9, suit: 'h' }, { rank: 10, suit: 'h' }, { rank: 12, suit: 'h' }
+  ];
+
   const outs = 9; // Flush outs
   const equity = 36; // 9 outs * 4
   const potAmount = 500;
@@ -945,6 +1624,17 @@ function createFallbackScenario(): CallPracticeScenario {
     equity,
     potOdds,
     correctDecision: 'call',
-    description: `You have A♥ K♥ on the flop with J♥ 7♥ 2♦. Pot: $${potAmount}, Call: $${callAmount}.`
+    description: `You have A♥ K♥ on the flop with J♥ 7♥ 2♦. Pot: $${potAmount}, Call: $${callAmount}.`,
+    outCards: {
+      primary: flushOuts,
+      secondary: [],
+      total: flushOuts
+    },
+    outBreakdown: {
+      primaryOuts: 9,
+      primaryType: "Flush",
+      secondaryOuts: 0,
+      secondaryTypes: []
+    }
   };
 }

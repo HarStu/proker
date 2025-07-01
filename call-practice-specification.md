@@ -6,8 +6,7 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 **Core Elements:**
 - Hole cards (2 cards)
 - Board (flop or turn)
-- Pot size
-- Call amount
+- Pot size and call amount
 - Count outs to improve (including secondary outs)
 - Make call/fold decision
 
@@ -38,20 +37,20 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 5. **Three of a Kind Draws** (5%) - pair with overcard (2 outs)
 
 **Outs Definition:**
-- Count cards that improve your hand
-- Include secondary outs (e.g., flush draw + overcard outs)
-- **Four of a Kind:** Only as secondary draw, never primary
-- Example: A♠K♠ on J♠7♠2♥ = 9 flush outs + 3 overcard outs = 12 total outs
+- Record each specific card that improves your hand
+- Track both primary and secondary outs separately:
+  - Primary: Main draw outs (e.g., flush draw cards)
+  - Secondary: Additional improvement cards (e.g., overcards)
+- **Four of a Kind:** Only tracked as secondary outs, never primary
+- Example: A♠K♠ on J♠7♠2♥
+  - Primary (9 flush outs): 2♠,3♠,4♠,5♠,6♠,8♠,9♠,10♠,Q♠ 
+  - Secondary (3 overcard outs): A♥,A♣,K♥
+  - Total: 12 specific outs tracked
 
 **Outs Range:**
 - Minimum: 2 outs
 - Maximum: 12 outs
 - Avoid impossible draws
-
-**Hand Improvement Clarity:**
-- Starting hands are clear and simple (never better than pair)
-- Draws to improve are obvious and countable
-- No complex made hands that obscure the drawing situation
 
 ### 4. Pot and Call Amounts
 **Pot Sizes:**
@@ -70,18 +69,18 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 - Calculable by players
 - **Range: 8%-62%** (adjusted for 50/50 balance)
 - **Target:** Close to equity (±8% range)
-- Clear enough for decisions
+- **Formula:** `potOdds = callAmount / (potAmount + callAmount) × 100`
 
 **Equity:**
-- Use Rule of 4 and 2
+- Use Rule of 4 and 2: `equity = outs × multiplier`
+- Multiplier: 4 for flop (2 cards to come), 2 for turn (1 card to come)
 - Range: 10%-50%
-- **Basis for pot odds generation**
+- Basis for pot odds generation
 
 **Decisions:**
 - **50/50 mix:** Equal distribution of positive EV calls and negative EV folds
 - **Close decisions:** Equity within ±8% of pot odds
 - Avoid extreme differences (>10% gap)
-- Include both +EV and -EV calls for learning
 
 ### 6. Educational Value
 **Learning Objectives:**
@@ -99,72 +98,26 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 - Counting outs to hands not better than current pair
 - Confusing made hands with drawing hands
 
-### 7. Constraints
-**Card Availability:**
-- Ensure draws are possible
-- Avoid impossible scenarios
-- No initial hands better than one pair
-
-**Variety:**
-- Include different draw types
-- Prevent pattern recognition
-- Mix paired and unpaired starting hands
-- **Balanced decisions:** 50% profitable calls, 50% unprofitable folds
-
-### 8. Quality Checks
-**Requirements:**
-- Clear correct answer
-- Accurate outs counting
-- Calculable pot odds
-- Estimable equity
-- Initial hand no better than one pair
-
-**Criteria:**
-- Solvable by beginners
-- No calculator needed
-- Realistic scenarios
-
 ## Implementation
 
-### Generation Steps:
+### Generation Process:
 1. Choose flop (70%) or turn (30%)
 2. Select draw type based on frequency
 3. Generate board for that draw (ensuring no better than pair initially)
 4. Select hole cards involved in draw
 5. Calculate outs (including secondary)
-6. **Calculate equity** based on outs and cards to see
-7. **Generate pot/call amounts** to target 50/50 EV distribution
+6. Calculate equity based on outs and cards to see
+7. Generate pot/call amounts to target 50/50 EV distribution
 8. Validate scenario
 
-### Balanced EV Distribution Plan:
+### Balanced EV Distribution Strategy:
+- Calculate equity from outs
+- Determine target pot odds range (equity ± 8%)
+- Generate realistic pot amount
+- Calculate call amount to achieve target pot odds
+- Validate the resulting decision maintains 50/50 balance
 
-**Step 6: Calculate Equity**
-- Use Rule of 4 and 2: `equity = outs × multiplier`
-- Multiplier: 4 for flop (2 cards to come), 2 for turn (1 card to come)
-- Result: Equity percentage (e.g., 36%)
-
-**Step 7: Generate Pot/Call for 50/50 Distribution**
-- **Target Range:** Create pot odds that make the decision close to 50/50
-- **Formula:** `potOdds = callAmount / (potAmount + callAmount) × 100`
-- **Strategy:** 
-  - If equity = 36%, target pot odds range of 28-44%
-  - This creates scenarios where equity ≈ pot odds (close decisions)
-  - Avoid extreme differences (>10% gap) that create obvious calls/folds
-
-**Pot Odds Range by Equity:**
-- Equity 10-20%: Pot odds 8-32% (close to equity)
-- Equity 20-30%: Pot odds 18-42% (close to equity)  
-- Equity 30-40%: Pot odds 28-52% (close to equity)
-- Equity 40-50%: Pot odds 38-62% (close to equity)
-
-**Implementation:**
-1. Calculate equity from outs
-2. Determine target pot odds range (equity ± 8%)
-3. Generate pot amount (realistic range)
-4. Calculate call amount to achieve target pot odds
-5. Validate the resulting decision is close to 50/50
-
-### Quality Checks:
+### Quality Validation Checklist:
 - [ ] Hole cards involved in draw
 - [ ] Initial hand no better than one pair
 - [ ] Outs count: 2-12
@@ -175,8 +128,47 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 - [ ] Realistic scenario
 - [ ] No calculator needed
 - [ ] Includes secondary outs (including four of a kind)
-- [ ] Proper pair improvement logic
 - [ ] Four of a kind only as secondary draw
 - [ ] Balanced EV distribution (target 50/50)
 
-This specification creates simple, educational poker scenarios focusing on outs to improve from hands no better than one pair.
+## Implementation Status
+
+**Current Implementation Features:**
+- Weighted draw type selection (35% flush, 30% straight, 20% full house, 10% two pair, 5% three of a kind)
+- Board generation (70% flop, 30% turn)
+- **Fixed straight draw generator** with proper card tracking and multiple draw types:
+  - Open-ended straight draws (8 outs)
+  - Gutshot straight draws (4 outs)
+  - No card duplication issues
+  - Proper drawing scenarios (not completed hands)
+- **Enhanced validation system** that prevents:
+  - Starting with completed straights
+  - Starting with completed flushes (5+ suited cards)
+  - Starting with trips or better
+  - Duplicate cards across hole cards and board
+- Comprehensive outs calculation (primary + secondary + four of a kind)
+- Balanced pot odds generation targeting equity ± 8%
+- Fallback scenario system for reliability
+
+**Critical Technical Requirements:**
+- **Single Deck Integrity**: All generators draw from actual deck with proper card tracking
+- Uses Set-based card tracking to prevent duplicates across ALL draw types
+- Retry logic with fallback scenarios for reliability
+- Multiple straight draw patterns (open-ended, gutshot)
+- Comprehensive hand validation before scenario acceptance
+- **Detailed outs calculation and display**:
+  - Shows actual cards that are outs (not just count)
+  - Separates primary outs (main draw) from secondary outs (overcards, quads)
+  - Visual display with color coding (blue for primary, yellow for secondary)
+  - Breakdown showing outs by type (flush, straight, etc.)
+- **Deck Management**: 
+  - All cards come from single 52-card deck
+  - No impossible scenarios (like two 5♣)
+  - Proper shuffling and card selection for each draw type
+
+**UI Implementation:**
+- Four-color card display for better suit recognition
+- Clear mathematical explanations for educational value
+- Color-coded decision display (green for call, red for fold)
+
+This specification creates educational poker scenarios focusing on outs to improve from hands no better than one pair.
