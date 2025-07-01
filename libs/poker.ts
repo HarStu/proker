@@ -547,3 +547,404 @@ function selectWeightedRandom(weights: number[]): number {
 
   return weights.length - 1; // Fallback
 }
+
+export interface CallPracticeScenario {
+  holeCards: Card[];
+  boardCards: Card[];
+  potAmount: number;
+  callAmount: number;
+  outs: number;
+  equity: number;
+  potOdds: number;
+  correctDecision: 'call' | 'fold';
+  description: string;
+}
+
+export function generateCallPracticeScenario(): CallPracticeScenario {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+
+    // Step 1: Choose flop (70%) or turn (30%)
+    const isFlop = Math.random() < 0.7;
+    const boardCardCount = isFlop ? 3 : 4;
+
+    // Step 2: Select draw type based on frequency
+    const drawTypes = [
+      { type: 'flush', weight: 35 },
+      { type: 'straight', weight: 30 },
+      { type: 'fullHouse', weight: 20 },
+      { type: 'twoPair', weight: 10 },
+      { type: 'threeOfAKind', weight: 5 }
+    ];
+
+    const selectedDraw = selectWeightedDrawType(drawTypes);
+
+    // Step 3: Generate board ensuring no better than pair initially
+    const { holeCards, boardCards, deck } = generateValidScenario(boardCardCount, selectedDraw);
+
+    // Validate initial hand is no better than a pair
+    if (!isValidStartingHand(holeCards, boardCards)) {
+      continue;
+    }
+
+    // Step 5: Calculate outs (including secondary and four of a kind)
+    const outs = calculateAllOuts(holeCards, boardCards, deck);
+
+    if (outs < 2 || outs > 12) {
+      continue;
+    }
+
+    // Step 6: Calculate equity based on outs and cards to see
+    const cardsToSee = Math.max(0, 5 - boardCards.length);
+    const equity = calculateEquity(outs, cardsToSee);
+
+    // Step 7: Generate pot/call amounts to target 50/50 EV distribution
+    const { potAmount, callAmount, potOdds } = generateBalancedPotOdds(equity);
+
+    // Validate the scenario meets requirements
+    if (!isValidScenario(equity, potOdds, outs)) {
+      continue;
+    }
+
+    // Determine correct decision
+    const correctDecision: 'call' | 'fold' = equity > potOdds ? 'call' : 'fold';
+
+    // Generate description
+    const description = generateScenarioDescription(holeCards, boardCards, potAmount, callAmount, isFlop);
+
+    return {
+      holeCards,
+      boardCards,
+      potAmount,
+      callAmount,
+      outs,
+      equity,
+      potOdds,
+      correctDecision,
+      description
+    };
+  }
+
+  // Fallback: create a simple flush draw scenario
+  return createFallbackScenario();
+}
+
+// Helper functions
+
+function selectWeightedDrawType(drawTypes: { type: string; weight: number }[]): string {
+  const weights = drawTypes.map(d => d.weight);
+  const selectedIndex = selectWeightedRandom(weights);
+  return drawTypes[selectedIndex].type;
+}
+
+function generateValidScenario(boardCardCount: number, drawType: string): { holeCards: Card[]; boardCards: Card[]; deck: Deck } {
+  const deck = generateDeck();
+  let holeCards: Card[] = [];
+  let boardCards: Card[] = [];
+
+  // Generate based on draw type
+  switch (drawType) {
+    case 'flush':
+      ({ holeCards, boardCards } = generateFlushDraw(deck, boardCardCount));
+      break;
+    case 'straight':
+      ({ holeCards, boardCards } = generateStraightDraw(deck, boardCardCount));
+      break;
+    case 'fullHouse':
+      ({ holeCards, boardCards } = generateFullHouseDraw(deck, boardCardCount));
+      break;
+    case 'twoPair':
+      ({ holeCards, boardCards } = generateTwoPairDraw(deck, boardCardCount));
+      break;
+    case 'threeOfAKind':
+      ({ holeCards, boardCards } = generateThreeOfAKindDraw(deck, boardCardCount));
+      break;
+    default:
+      ({ holeCards, boardCards } = generateFlushDraw(deck, boardCardCount));
+  }
+
+  return { holeCards, boardCards, deck };
+}
+
+function generateFlushDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const suit = ['h', 'd', 'c', 's'][Math.floor(Math.random() * 4)] as Suit;
+  const ranks = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+
+  const holeCards: Card[] = [];
+  const boardCards: Card[] = [];
+
+  // 2 suited hole cards
+  for (let i = 0; i < 2; i++) {
+    const rank = ranks[Math.floor(Math.random() * ranks.length)] as Rank;
+    holeCards.push({ rank, suit });
+  }
+
+  // 2 suited cards on board, rest off-suit
+  for (let i = 0; i < boardCardCount; i++) {
+    if (i < 2) {
+      const rank = ranks[Math.floor(Math.random() * ranks.length)] as Rank;
+      boardCards.push({ rank, suit });
+    } else {
+      const offSuit = ['h', 'd', 'c', 's'].filter(s => s !== suit)[Math.floor(Math.random() * 3)] as Suit;
+      const rank = ranks[Math.floor(Math.random() * ranks.length)] as Rank;
+      boardCards.push({ rank, suit: offSuit });
+    }
+  }
+
+  return { holeCards, boardCards };
+}
+
+function generateStraightDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  // Generate open-ended straight draw
+  const startRank = 5 + Math.floor(Math.random() * 6); // 5-10 to avoid wheel complications
+  const suits = ['h', 'd', 'c', 's'];
+
+  const holeCards: Card[] = [];
+  const boardCards: Card[] = [];
+
+  // Hole cards: consecutive ranks
+  holeCards.push({ rank: startRank as Rank, suit: suits[Math.floor(Math.random() * 4)] as Suit });
+  holeCards.push({ rank: (startRank + 1) as Rank, suit: suits[Math.floor(Math.random() * 4)] as Suit });
+
+  // Board cards: fill in some of the straight
+  for (let i = 0; i < boardCardCount; i++) {
+    const rank = (startRank + 2 + i) as Rank;
+    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
+    boardCards.push({ rank, suit });
+  }
+
+  return { holeCards, boardCards };
+}
+
+function generateFullHouseDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const suits = ['h', 'd', 'c', 's'];
+  const rank1 = (2 + Math.floor(Math.random() * 11)) as Rank; // 2-12
+  const rank2 = (2 + Math.floor(Math.random() * 11)) as Rank; // 2-12
+
+  const holeCards: Card[] = [];
+  const boardCards: Card[] = [];
+
+  // Pocket pair
+  holeCards.push({ rank: rank1, suit: suits[0] as Suit });
+  holeCards.push({ rank: rank1, suit: suits[1] as Suit });
+
+  // Board has one matching rank (for trips) and other cards
+  boardCards.push({ rank: rank1, suit: suits[2] as Suit }); // Makes trips
+
+  for (let i = 1; i < boardCardCount; i++) {
+    const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
+    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
+    boardCards.push({ rank, suit });
+  }
+
+  return { holeCards, boardCards };
+}
+
+function generateTwoPairDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const suits = ['h', 'd', 'c', 's'];
+  const rank1 = (2 + Math.floor(Math.random() * 11)) as Rank;
+  const rank2 = (2 + Math.floor(Math.random() * 11)) as Rank;
+
+  const holeCards: Card[] = [];
+  const boardCards: Card[] = [];
+
+  // One pair in hole cards
+  holeCards.push({ rank: rank1, suit: suits[0] as Suit });
+  holeCards.push({ rank: rank1, suit: suits[1] as Suit });
+
+  // Board has potential second pair
+  boardCards.push({ rank: rank2, suit: suits[0] as Suit });
+
+  for (let i = 1; i < boardCardCount; i++) {
+    const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
+    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
+    boardCards.push({ rank, suit });
+  }
+
+  return { holeCards, boardCards };
+}
+
+function generateThreeOfAKindDraw(deck: Deck, boardCardCount: number): { holeCards: Card[]; boardCards: Card[] } {
+  const suits = ['h', 'd', 'c', 's'];
+  const rank1 = (2 + Math.floor(Math.random() * 11)) as Rank;
+
+  const holeCards: Card[] = [];
+  const boardCards: Card[] = [];
+
+  // Pocket pair
+  holeCards.push({ rank: rank1, suit: suits[0] as Suit });
+  holeCards.push({ rank: rank1, suit: suits[1] as Suit });
+
+  // Board with potential to make trips
+  for (let i = 0; i < boardCardCount; i++) {
+    const rank = (2 + Math.floor(Math.random() * 11)) as Rank;
+    const suit = suits[Math.floor(Math.random() * 4)] as Suit;
+    boardCards.push({ rank, suit });
+  }
+
+  return { holeCards, boardCards };
+}
+
+function isValidStartingHand(holeCards: Card[], boardCards: Card[]): boolean {
+  const allCards = [...holeCards, ...boardCards];
+  const rankCounts = new Map<Rank, number>();
+
+  allCards.forEach(card => {
+    rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+  });
+
+  // Check that we don't start with better than a pair
+  const maxCount = Math.max(...rankCounts.values());
+  return maxCount <= 2; // Pair or less
+}
+
+function calculateAllOuts(holeCards: Card[], boardCards: Card[], deck: Deck): number {
+  let totalOuts = 0;
+
+  // Primary outs (flush, straight, etc.)
+  const primaryOuts = Math.max(
+    countOuts(holeCards, boardCards, "Flush", deck),
+    countOuts(holeCards, boardCards, "Straight", deck),
+    countOuts(holeCards, boardCards, "Full House", deck),
+    countOuts(holeCards, boardCards, "Two Pair", deck),
+    countOuts(holeCards, boardCards, "Three of a Kind", deck)
+  );
+
+  totalOuts += primaryOuts;
+
+  // Secondary outs (overcards)
+  const secondaryOuts = calculateOvercardOuts(holeCards, boardCards, deck);
+  totalOuts += secondaryOuts;
+
+  // Four of a kind outs (secondary only)
+  const quadOuts = calculateQuadOuts(holeCards, boardCards, deck);
+  totalOuts += quadOuts;
+
+  return Math.min(12, totalOuts);
+}
+
+function calculateOvercardOuts(holeCards: Card[], boardCards: Card[], deck: Deck): number {
+  if (boardCards.length === 0) return 0;
+
+  const boardRanks = boardCards.map(c => c.rank);
+  const maxBoardRank = Math.max(...boardRanks);
+  let overcardOuts = 0;
+
+  holeCards.forEach(card => {
+    if (card.rank > maxBoardRank) {
+      const remainingCards = deck.filter(d => d.rank === card.rank);
+      overcardOuts += remainingCards.length;
+    }
+  });
+
+  return overcardOuts;
+}
+
+function calculateQuadOuts(holeCards: Card[], boardCards: Card[], deck: Deck): number {
+  const allCards = [...holeCards, ...boardCards];
+  const rankCounts = new Map<Rank, number>();
+
+  allCards.forEach(card => {
+    rankCounts.set(card.rank, (rankCounts.get(card.rank) || 0) + 1);
+  });
+
+  let quadOuts = 0;
+
+  // Check for trips that can become quads
+  for (const [rank, count] of rankCounts) {
+    if (count === 3) {
+      const remainingCards = deck.filter(d => d.rank === rank);
+      quadOuts += remainingCards.length;
+    }
+  }
+
+  return quadOuts;
+}
+
+function generateBalancedPotOdds(equity: number): { potAmount: number; callAmount: number; potOdds: number } {
+  // Target pot odds range: equity ± 8%
+  const minPotOdds = Math.max(8, equity - 8);
+  const maxPotOdds = Math.min(62, equity + 8);
+
+  // Generate target pot odds within range
+  const targetPotOdds = minPotOdds + Math.random() * (maxPotOdds - minPotOdds);
+
+  // Generate realistic pot amount
+  const potRanges = [
+    { min: 50, max: 300, weight: 30 },
+    { min: 300, max: 1000, weight: 40 },
+    { min: 1000, max: 3000, weight: 20 },
+    { min: 3000, max: 10000, weight: 10 }
+  ];
+
+  const weights = potRanges.map(r => r.weight);
+  const selectedIndex = selectWeightedRandom(weights);
+  const selectedRange = potRanges[selectedIndex];
+  const potAmount = Math.floor(Math.random() * (selectedRange.max - selectedRange.min + 1)) + selectedRange.min;
+
+  // Calculate call amount to achieve target pot odds
+  // targetPotOdds = callAmount / (potAmount + callAmount) * 100
+  // callAmount = targetPotOdds * (potAmount + callAmount) / 100
+  // callAmount = targetPotOdds * potAmount / (100 - targetPotOdds)
+  const callAmount = Math.round((targetPotOdds * potAmount) / (100 - targetPotOdds));
+
+  // Calculate actual pot odds
+  const actualPotOdds = (callAmount / (potAmount + callAmount)) * 100;
+
+  return { potAmount, callAmount, potOdds: actualPotOdds };
+}
+
+function isValidScenario(equity: number, potOdds: number, outs: number): boolean {
+  // Check if equity is within ±8% of pot odds
+  const difference = Math.abs(equity - potOdds);
+  return difference <= 8 && outs >= 2 && outs <= 12 && equity >= 10 && equity <= 50;
+}
+
+function generateScenarioDescription(holeCards: Card[], boardCards: Card[], potAmount: number, callAmount: number, isFlop: boolean): string {
+  const formatCard = (card: Card) => {
+    const rank = card.rank === 11 ? 'J' : card.rank === 12 ? 'Q' : card.rank === 13 ? 'K' : card.rank === 14 ? 'A' : card.rank.toString();
+    const suit = card.suit === 'h' ? '♥' : card.suit === 'd' ? '♦' : card.suit === 'c' ? '♣' : '♠';
+    return rank + suit;
+  };
+
+  const holeCardDesc = holeCards.map(formatCard).join(' ');
+  const boardCardDesc = boardCards.map(formatCard).join(' ');
+  const street = isFlop ? 'flop' : 'turn';
+
+  return `You have ${holeCardDesc} on the ${street} with ${boardCardDesc}. Pot: $${potAmount}, Call: $${callAmount}.`;
+}
+
+function createFallbackScenario(): CallPracticeScenario {
+  // Simple flush draw fallback
+  const holeCards: Card[] = [
+    { rank: 14, suit: 'h' }, // Ace of hearts
+    { rank: 13, suit: 'h' }  // King of hearts
+  ];
+
+  const boardCards: Card[] = [
+    { rank: 11, suit: 'h' }, // Jack of hearts
+    { rank: 7, suit: 'h' },  // 7 of hearts
+    { rank: 2, suit: 'd' }   // 2 of diamonds
+  ];
+
+  const outs = 9; // Flush outs
+  const equity = 36; // 9 outs * 4
+  const potAmount = 500;
+  const callAmount = 150;
+  const potOdds = (callAmount / (potAmount + callAmount)) * 100; // ~23%
+
+  return {
+    holeCards,
+    boardCards,
+    potAmount,
+    callAmount,
+    outs,
+    equity,
+    potOdds,
+    correctDecision: 'call',
+    description: `You have A♥ K♥ on the flop with J♥ 7♥ 2♦. Pot: $${potAmount}, Call: $${callAmount}.`
+  };
+}
