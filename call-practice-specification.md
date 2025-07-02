@@ -175,4 +175,95 @@ Generate poker situations for call practice training. Focus on "outs to improve"
 - Clear mathematical explanations for educational value
 - Color-coded decision display (green for call, red for fold)
 
+## Database Schema for Practice History
+
+### Overview
+Store minimal practice history data on-device using expo-sqlite to track user performance and learning progress.
+
+### Database Schema
+
+#### Call Practice Attempts (`call_practice_attempts`)
+**Purpose:** Record each individual practice scenario and user response.
+
+**Schema:**
+```typescript
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+
+export const callPracticeAttempts = sqliteTable('call_practice_attempts', {
+  id: text('id').primaryKey(), // UUID for unique identification
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(), // Unix timestamp when attempt was made
+  
+  // Scenario data (stored as JSON strings)
+  holeCards: text('hole_cards').notNull(), // JSON array of 2 Card objects
+  boardCards: text('board_cards').notNull(), // JSON array of 3-4 Card objects
+  potAmount: real('pot_amount').notNull(), // Pot size in dollars
+  callAmount: real('call_amount').notNull(), // Call amount in dollars
+  outs: integer('outs').notNull(), // Total number of outs
+  equity: real('equity').notNull(), // Equity percentage (0-100)
+  potOdds: real('pot_odds').notNull(), // Pot odds percentage (0-100)
+  correctDecision: text('correct_decision', { enum: ['call', 'fold'] }).notNull(),
+  description: text('description').notNull(), // Human-readable scenario description
+  
+  // Out cards breakdown (stored as JSON)
+  outCardsPrimary: text('out_cards_primary').notNull(), // JSON array of primary out cards
+  outCardsSecondary: text('out_cards_secondary').notNull(), // JSON array of secondary out cards
+  outCardsTotal: text('out_cards_total').notNull(), // JSON array of all out cards
+  outBreakdown: text('out_breakdown').notNull(), // JSON object with out type breakdown
+  
+  // User response
+  userDecision: text('user_decision', { enum: ['call', 'fold'] }).notNull(),
+  isCorrect: integer('is_correct', { mode: 'boolean' }).notNull(),
+  
+  // Optional metadata
+  timeToDecision: integer('time_to_decision'), // Decision time in milliseconds
+  confidenceLevel: integer('confidence_level'), // User confidence 1-5 scale
+  notes: text('notes'), // User notes
+  platform: text('platform'), // Device/platform info
+  appVersion: text('app_version'), // App version
+});
+```
+
+### Data Storage Strategy
+
+#### JSON Storage for Complex Objects
+- **Card arrays**: Store as JSON strings for easy serialization/deserialization
+- **Out breakdowns**: Store detailed out information as JSON for analysis
+- **Settings objects**: Store nested objects as JSON for flexibility
+
+#### Minimal Required Fields
+For basic practice tracking, only these fields are essential:
+- `id`, `timestamp`, `hole_cards`, `board_cards`, `pot_amount`, `call_amount`
+- `outs`, `equity`, `pot_odds`, `correct_decision`, `user_decision`, `is_correct`
+
+#### Performance Considerations
+- Index on `timestamp` for time-based queries
+- Index on `is_correct` for accuracy calculations
+- Use prepared statements for repeated queries
+
+### Database Operations
+
+#### Core Functions Required:
+1. **Record Attempt**: Save new practice attempt with all scenario data
+2. **Get History**: Retrieve attempts with pagination and filtering
+
+#### Data Privacy:
+- All data stored locally on device
+- No cloud synchronization required
+- User can export/import data if needed
+- Clear data option for privacy
+
+### Integration Points
+
+#### Practice Flow Integration:
+1. **Scenario Generation**: Store complete scenario data when generated
+2. **User Response**: Record decision and timing when user answers
+3. **Result Display**: Show historical performance alongside current result
+
+#### Analytics Integration:
+- Track learning progress over time
+- Identify weak areas (scenario types, pot odds ranges)
+- Provide personalized practice recommendations
+- Generate progress reports and insights
+
 This specification creates educational poker scenarios focusing on outs to improve from hands no better than one pair.
