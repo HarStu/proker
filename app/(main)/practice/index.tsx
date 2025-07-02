@@ -1,6 +1,7 @@
 import { Text, View, Pressable, ScrollView, Animated, Dimensions } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { generateCallPracticeScenario, CallPracticeScenario } from "../../../libs/poker";
+import { dbOperations } from "../../../libs/db";
 
 type GamePhase = 'decision' | 'results';
 type PlayerDecision = 'call' | 'fold' | null;
@@ -22,8 +23,64 @@ export default function Practice() {
     slideAnim.setValue(0);
   };
 
+  const generateUUID = (): string => {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
+  const recordAttempt = async (scenario: CallPracticeScenario, userDecision: 'call' | 'fold') => {
+    try {
+      const isCorrect = userDecision === scenario.correctDecision;
+
+      console.log('Recording attempt:', {
+        userDecision,
+        correctDecision: scenario.correctDecision,
+        isCorrect,
+        description: scenario.description
+      });
+
+      await dbOperations.recordAttempt({
+        id: generateUUID(), // Generate unique ID
+        timestamp: new Date(),
+        holeCards: JSON.stringify(scenario.holeCards),
+        boardCards: JSON.stringify(scenario.boardCards),
+        potAmount: scenario.potAmount,
+        callAmount: scenario.callAmount,
+        outs: scenario.outs,
+        equity: scenario.equity,
+        potOdds: scenario.potOdds,
+        correctDecision: scenario.correctDecision,
+        description: scenario.description,
+        outCardsPrimary: JSON.stringify(scenario.outCards.primary),
+        outCardsSecondary: JSON.stringify(scenario.outCards.secondary),
+        outCardsTotal: JSON.stringify(scenario.outCards.total),
+        outBreakdown: JSON.stringify(scenario.outBreakdown),
+        userDecision: userDecision,
+        isCorrect: isCorrect,
+        // Optional metadata
+        platform: 'mobile',
+        appVersion: '1.0.0',
+      });
+
+      console.log('Practice attempt recorded successfully');
+
+    } catch (error) {
+      console.warn('Failed to record practice attempt:', error);
+      // Don't throw error - we don't want to break the game flow
+    }
+  };
+
   const handleDecision = (decision: 'call' | 'fold') => {
     setPlayerDecision(decision);
+
+    // Record the attempt in the database
+    if (scenario) {
+      recordAttempt(scenario, decision);
+    }
+
     // Slide to results view
     Animated.timing(slideAnim, {
       toValue: -screenWidth,
