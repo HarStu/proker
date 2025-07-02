@@ -24,18 +24,18 @@ export default function Practice() {
   };
 
   const generateUUID = (): string => {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = Math.random() * 16 | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    const timestamp = Date.now().toString(36);
+    const randomPart = Math.random().toString(36).substring(2, 15);
+    return `${timestamp}-${randomPart}`;
   };
 
   const recordAttempt = async (scenario: CallPracticeScenario, userDecision: 'call' | 'fold') => {
     try {
       const isCorrect = userDecision === scenario.correctDecision;
+      const attemptId = generateUUID();
 
       console.log('Recording attempt:', {
+        id: attemptId,
         userDecision,
         correctDecision: scenario.correctDecision,
         isCorrect,
@@ -43,7 +43,7 @@ export default function Practice() {
       });
 
       await dbOperations.recordAttempt({
-        id: generateUUID(), // Generate unique ID
+        id: attemptId,
         timestamp: new Date(),
         holeCards: JSON.stringify(scenario.holeCards),
         boardCards: JSON.stringify(scenario.boardCards),
@@ -65,7 +65,7 @@ export default function Practice() {
         appVersion: '1.0.0',
       });
 
-      console.log('Practice attempt recorded successfully');
+      console.log('Practice attempt recorded successfully with ID:', attemptId);
 
     } catch (error) {
       console.warn('Failed to record practice attempt:', error);

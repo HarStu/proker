@@ -5,68 +5,35 @@ import { sql } from 'drizzle-orm';
 
 // Database schema for call practice attempts
 export const callPracticeAttempts = sqliteTable('call_practice_attempts', {
-  id: text('id').primaryKey(), // UUID for unique identification
-  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(), // Unix timestamp when attempt was made
-
-  // Scenario data (stored as JSON strings)
-  holeCards: text('hole_cards').notNull(), // JSON array of 2 Card objects
-  boardCards: text('board_cards').notNull(), // JSON array of 3-4 Card objects
-  potAmount: real('pot_amount').notNull(), // Pot size in dollars
-  callAmount: real('call_amount').notNull(), // Call amount in dollars
-  outs: integer('outs').notNull(), // Total number of outs
-  equity: real('equity').notNull(), // Equity percentage (0-100)
-  potOdds: real('pot_odds').notNull(), // Pot odds percentage (0-100)
+  id: text('id').primaryKey(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  holeCards: text('hole_cards').notNull(),
+  boardCards: text('board_cards').notNull(),
+  potAmount: real('pot_amount').notNull(),
+  callAmount: real('call_amount').notNull(),
+  outs: integer('outs').notNull(),
+  equity: real('equity').notNull(),
+  potOdds: real('pot_odds').notNull(),
   correctDecision: text('correct_decision', { enum: ['call', 'fold'] }).notNull(),
-  description: text('description').notNull(), // Human-readable scenario description
-
-  // Out cards breakdown (stored as JSON)
-  outCardsPrimary: text('out_cards_primary').notNull(), // JSON array of primary out cards
-  outCardsSecondary: text('out_cards_secondary').notNull(), // JSON array of secondary out cards
-  outCardsTotal: text('out_cards_total').notNull(), // JSON array of all out cards
-  outBreakdown: text('out_breakdown').notNull(), // JSON object with out type breakdown
-
-  // User response
+  description: text('description').notNull(),
+  outCardsPrimary: text('out_cards_primary').notNull(),
+  outCardsSecondary: text('out_cards_secondary').notNull(),
+  outCardsTotal: text('out_cards_total').notNull(),
+  outBreakdown: text('out_breakdown').notNull(),
   userDecision: text('user_decision', { enum: ['call', 'fold'] }).notNull(),
   isCorrect: integer('is_correct', { mode: 'boolean' }).notNull(),
-
-  // Optional metadata
-  timeToDecision: integer('time_to_decision'), // Decision time in milliseconds
-  confidenceLevel: integer('confidence_level'), // User confidence 1-5 scale
-  notes: text('notes'), // User notes
-  platform: text('platform'), // Device/platform info
-  appVersion: text('app_version'), // App version
+  timeToDecision: integer('time_to_decision'),
+  confidenceLevel: integer('confidence_level'),
+  notes: text('notes'),
+  platform: text('platform'),
+  appVersion: text('app_version'),
 });
-
-// Export schema for migrations
-export const schema = {
-  callPracticeAttempts,
-};
 
 // Initialize database
 const sqlite = SQLite.openDatabaseSync('call_practice.db');
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(sqlite);
 
-// Simple cache for practice history
-let practiceHistoryCache: any[] = [];
-let cacheTimestamp: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-// Cache management functions
-const isCacheValid = () => {
-  return Date.now() - cacheTimestamp < CACHE_DURATION;
-};
-
-const updateCache = (data: any[]) => {
-  practiceHistoryCache = data;
-  cacheTimestamp = Date.now();
-};
-
-const invalidateCache = () => {
-  practiceHistoryCache = [];
-  cacheTimestamp = 0;
-};
-
-// Database operations
+// Simple database operations
 export const dbOperations = {
   // Create table if it doesn't exist
   async createTableIfNotExists() {
@@ -103,12 +70,13 @@ export const dbOperations = {
       throw error;
     }
   },
+
   // Record a new practice attempt
   async recordAttempt(attempt: {
     id: string;
     timestamp: Date;
-    holeCards: string; // JSON string
-    boardCards: string; // JSON string
+    holeCards: string;
+    boardCards: string;
     potAmount: number;
     callAmount: number;
     outs: number;
@@ -116,10 +84,10 @@ export const dbOperations = {
     potOdds: number;
     correctDecision: 'call' | 'fold';
     description: string;
-    outCardsPrimary: string; // JSON string
-    outCardsSecondary: string; // JSON string
-    outCardsTotal: string; // JSON string
-    outBreakdown: string; // JSON string
+    outCardsPrimary: string;
+    outCardsSecondary: string;
+    outCardsTotal: string;
+    outBreakdown: string;
     userDecision: 'call' | 'fold';
     isCorrect: boolean;
     timeToDecision?: number;
@@ -129,97 +97,78 @@ export const dbOperations = {
     appVersion?: string;
   }) {
     console.log('Database: Recording attempt with ID:', attempt.id);
-    // Ensure table exists before inserting
     await this.createTableIfNotExists();
-    const result = await db.insert(callPracticeAttempts).values(attempt);
-    console.log('Database: Insert result:', result);
 
-
-
-    return result;
-  },
-
-  // Get practice history with pagination (with caching)
-  async getHistory(limit: number = 50, offset: number = 0) {
-    console.log('Database: Getting history with limit:', limit, 'offset:', offset);
-
-    // Always query fresh data for now (disable caching temporarily)
-    await this.createTableIfNotExists();
-    const result = await db
-      .select()
-      .from(callPracticeAttempts)
-      .orderBy(sql`timestamp DESC`)
-      .limit(limit)
-      .offset(offset);
-    console.log('Database: History query result:', result.length, 'records');
-
-    return result;
+    try {
+      const result = await db.insert(callPracticeAttempts).values(attempt);
+      console.log('Database: Insert successful for ID:', attempt.id);
+      return result;
+    } catch (error) {
+      console.error('Database: Insert failed for ID:', attempt.id, 'Error:', error);
+      throw error;
+    }
   },
 
   // Get all attempts (for statistics)
   async getAllAttempts() {
-    // Ensure table exists before querying
+    console.log('Database: Getting all attempts');
     await this.createTableIfNotExists();
-    return await db.select().from(callPracticeAttempts);
-  },
 
-  // Get attempts by date range
-  async getAttemptsByDateRange(startDate: Date, endDate: Date) {
-    // Ensure table exists before querying
-    await this.createTableIfNotExists();
-    return await db
-      .select()
-      .from(callPracticeAttempts)
-      .where(
-        sql`timestamp >= ${startDate.getTime()} AND timestamp <= ${endDate.getTime()}`
-      )
-      .orderBy(sql`timestamp DESC`);
-  },
-
-  // Get recent attempts (last N days)
-  async getRecentAttempts(days: number = 7) {
-    // Ensure table exists before querying
-    await this.createTableIfNotExists();
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
-
-    return await db
-      .select()
-      .from(callPracticeAttempts)
-      .where(sql`timestamp >= ${cutoffDate.getTime()}`)
-      .orderBy(sql`timestamp DESC`);
-  },
-
-
-
-  // Clear all data (for privacy/reset)
-  async clearAllData() {
-    // Ensure table exists before deleting
-    await this.createTableIfNotExists();
-    const result = await db.delete(callPracticeAttempts);
-
-
-
-    return result;
-  },
-
-  // Pre-cache the latest practice history (call this after recording an attempt)
-  async preCacheHistory() {
-    console.log('Database: Pre-caching practice history');
     try {
-      await this.createTableIfNotExists();
+      const result = await db.select().from(callPracticeAttempts);
+      console.log('Database: Retrieved', result.length, 'total attempts');
+      return result;
+    } catch (error) {
+      console.error('Database: Failed to get all attempts:', error);
+      return [];
+    }
+  },
+
+  // Get recent attempts (for history display)
+  async getRecentAttempts(limit: number = 10) {
+    console.log('Database: Getting recent attempts, limit:', limit);
+    await this.createTableIfNotExists();
+
+    try {
       const result = await db
         .select()
         .from(callPracticeAttempts)
         .orderBy(sql`timestamp DESC`)
-        .limit(50);
-
-      updateCache(result);
-      console.log('Database: Pre-cached', result.length, 'records');
+        .limit(limit);
+      console.log('Database: Retrieved', result.length, 'recent attempts');
       return result;
     } catch (error) {
-      console.warn('Database: Failed to pre-cache history:', error);
+      console.error('Database: Failed to get recent attempts:', error);
       return [];
+    }
+  },
+
+  // Clear all data
+  async clearAllData() {
+    console.log('Database: Clearing all data');
+    await this.createTableIfNotExists();
+
+    try {
+      const result = await db.delete(callPracticeAttempts);
+      console.log('Database: All data cleared');
+      return result;
+    } catch (error) {
+      console.error('Database: Failed to clear data:', error);
+      throw error;
+    }
+  },
+
+  // Reset database (drop and recreate table)
+  async resetDatabase() {
+    console.log('Database: Resetting database');
+    try {
+      await db.run(sql`DROP TABLE IF EXISTS call_practice_attempts`);
+      console.log('Database: Table dropped');
+      await this.createTableIfNotExists();
+      console.log('Database: Table recreated');
+    } catch (error) {
+      console.error('Database: Failed to reset database:', error);
+      throw error;
     }
   },
 };

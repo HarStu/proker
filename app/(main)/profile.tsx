@@ -18,8 +18,9 @@ export default function Profile() {
 
       console.log('Loading practice history...');
       // Load practice history
-      const history = await dbOperations.getHistory(10); // Get last 10 attempts
+      const history = await dbOperations.getAllAttempts(); // Get all attempts for stats
       console.log('Practice history loaded:', history.length, 'attempts');
+      console.log('History details:', history.map(h => ({ id: h.id, isCorrect: h.isCorrect, description: h.description })));
       setPracticeHistory(history);
     } catch (error) {
       console.warn("Failed to load data:", error);
@@ -65,33 +66,52 @@ export default function Profile() {
           </View>
           <View className="items-center">
             <Text className="text-3xl font-bold text-green-600">
-              {practiceHistory.filter(a => a.isCorrect).length}
+              {(() => {
+                const correct = practiceHistory.filter(a => a.isCorrect).length;
+                console.log('Calculating correct answers:', correct, 'out of', practiceHistory.length);
+                return correct;
+              })()}
             </Text>
             <Text className="text-sm text-gray-600">Correct</Text>
           </View>
           <View className="items-center">
             <Text className="text-3xl font-bold text-purple-600">
-              {practiceHistory.length > 0
-                ? Math.round((practiceHistory.filter(a => a.isCorrect).length / practiceHistory.length) * 100)
-                : 0}%
+              {(() => {
+                const correct = practiceHistory.filter(a => a.isCorrect).length;
+                const total = practiceHistory.length;
+                const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+                console.log('Calculating accuracy:', correct, '/', total, '=', accuracy + '%');
+                return accuracy;
+              })()}%
             </Text>
             <Text className="text-sm text-gray-600">Accuracy</Text>
           </View>
         </View>
       </View>
 
-      {/* Dev Reset Button */}
+      {/* Dev Reset Buttons */}
       {__DEV__ && (
-        <Pressable
-          className="mt-6 px-4 py-2 bg-red-500 rounded-md self-center"
-          onPress={async () => {
-            await SecureStore.deleteItemAsync('userUUID');
-            await SecureStore.deleteItemAsync('userName');
-            router.replace('/welcome');
-          }}
-        >
-          <Text className="text-white">Reset onboarding (DEV)</Text>
-        </Pressable>
+        <View className="mt-6 gap-2">
+          <Pressable
+            className="px-4 py-2 bg-red-500 rounded-md self-center"
+            onPress={async () => {
+              await SecureStore.deleteItemAsync('userUUID');
+              await SecureStore.deleteItemAsync('userName');
+              router.replace('/welcome');
+            }}
+          >
+            <Text className="text-white">Reset onboarding (DEV)</Text>
+          </Pressable>
+          <Pressable
+            className="px-4 py-2 bg-orange-500 rounded-md self-center"
+            onPress={async () => {
+              await dbOperations.resetDatabase();
+              loadData();
+            }}
+          >
+            <Text className="text-white">Reset database (DEV)</Text>
+          </Pressable>
+        </View>
       )}
     </View>
   );
